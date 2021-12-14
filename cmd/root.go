@@ -30,6 +30,10 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		flags := cmd.Flags()
 
+		if iptScript == "" {
+			log.Fatalln("No script file was specified, existing...")
+		}
+
 		//read scripts from file
 		yamlFile, err := ioutil.ReadFile(iptScript)
 		if err != nil {
