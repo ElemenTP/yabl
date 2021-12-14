@@ -12,6 +12,7 @@ var (
 	BuildTime = "unknown time"
 )
 
+//Add version command into the cli app, will show version info and compile time.
 func init() {
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",
