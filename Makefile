@@ -2,8 +2,8 @@ NAME=yabl
 BINDIR=bin
 VERSION=$(shell git describe --tags || echo "unknown version")
 BUILDTIME=$(shell date -u)
-GOBUILD=CGO_ENABLED=0 go build -trimpath -ldflags '-X "yabl/constant.Version=$(VERSION)" \
-		-X "yabl/constant.BuildTime=$(BUILDTIME)" \
+GOBUILD=CGO_ENABLED=0 go build -trimpath -ldflags '-X "yabl/cmd.Version=$(VERSION)" \
+		-X "yabl/cmd.BuildTime=$(BUILDTIME)" \
 		-w -s -buildid='
 
 PLATFORM_LIST = \

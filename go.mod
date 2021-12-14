@@ -2,7 +2,7 @@ module yabl
 
 go 1.17
 
-require github.com/spf13/cobra v1.1.3
+require github.com/spf13/cobra v1.2.1
 
 require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
