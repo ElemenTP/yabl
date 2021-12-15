@@ -3,6 +3,7 @@ package cmd
 import (
 	"io/ioutil"
 	"log"
+	"strconv"
 	"strings"
 
 	"yabl/lib"
@@ -30,6 +31,7 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		flags := cmd.Flags()
 
+		//exit when no script file was specified.
 		if iptScript == "" {
 			log.Fatalln("No script file was specified, existing...")
 		}
@@ -62,10 +64,12 @@ var rootCmd = &cobra.Command{
 			laddr = laddr[5:]
 			lnet = "unix"
 		} else {
-			var port string
+			var port string //listen port
 			switch value := lib.Script["port"].(type) {
 			case string:
 				port = value
+			case int:
+				port = strconv.Itoa(value)
 			default:
 				port, err = flags.GetString("port")
 				if err != nil {
