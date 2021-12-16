@@ -12,7 +12,8 @@
             ],
             "problemMatcher": [
                 "$go"
-            ]
+            ],
+            "group": "build"
         },
         {
             "label": "build-darwin",
@@ -23,7 +24,8 @@
             ],
             "problemMatcher": [
                 "$go"
-            ]
+            ],
+            "group": "build"
         },
         {
             "label": "build-windows",
@@ -34,7 +36,8 @@
             ],
             "problemMatcher": [
                 "$go"
-            ]
+            ],
+            "group": "build"
         }
     ]
 }

@@ -16,7 +16,7 @@ var (
 func init() {
 	rootCmd.AddCommand(&cobra.Command{
 		Use:   "version",
-		Short: "Print the version number",
+		Short: "Show version information",
 		Run: func(cmd *cobra.Command, args []string) {
 			fmt.Printf("yabl %s %s %s with %s %s\n", Version, runtime.GOOS, runtime.GOARCH, runtime.Version(), BuildTime)
 		},

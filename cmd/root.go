@@ -20,8 +20,8 @@ var (
 func init() {
 	flags := rootCmd.Flags()
 	flags.StringVarP(&iptScript, "script", "s", "", "script file path")
-	flags.StringP("address", "a", "127.0.0.1", "address to listen to")
-	flags.StringP("port", "p", "8080", "port to listen to")
+	flags.StringP("address", "a", "", "server listen address (default 127.0.0.1)")
+	flags.StringP("port", "p", "", "server listen port (default 8080)")
 }
 
 var rootCmd = &cobra.Command{
@@ -47,16 +47,21 @@ var rootCmd = &cobra.Command{
 		}
 		log.Println("Read script from ", iptScript)
 
+		//compile script
+		lib.Compile()
+
 		//parse server settings from script and flags.
 		var laddr string //listen address
-		switch value := lib.Script["address"].(type) {
-		case string:
-			laddr = value
-
-		default:
-			laddr, err = flags.GetString("address")
-			if err != nil {
-				log.Fatalln(err)
+		laddr, err = flags.GetString("address")
+		if err != nil {
+			log.Println(err)
+		}
+		if laddr == "" {
+			switch value := lib.Script["address"].(type) {
+			case string:
+				laddr = value
+			default:
+				laddr = "127.0.0.1"
 			}
 		}
 		var lnet string
@@ -65,15 +70,18 @@ var rootCmd = &cobra.Command{
 			lnet = "unix"
 		} else {
 			var port string //listen port
-			switch value := lib.Script["port"].(type) {
-			case string:
-				port = value
-			case int:
-				port = strconv.Itoa(value)
-			default:
-				port, err = flags.GetString("port")
-				if err != nil {
-					log.Fatalln(err)
+			port, err = flags.GetString("port")
+			if err != nil {
+				log.Println(err)
+			}
+			if port == "" {
+				switch value := lib.Script["port"].(type) {
+				case string:
+					port = value
+				case int:
+					port = strconv.Itoa(value)
+				default:
+					port = "8080"
 				}
 			}
 			laddr = laddr + ":" + port
