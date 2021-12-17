@@ -456,7 +456,7 @@ func Compile() {
 							}
 							if constCount == 1 {
 								tempOpIL.haspc = true
-								if len(tempOpIL.opElem[1+prefix].content) == 0 {
+								if tempOpIL.opElem[1+prefix].content == "" {
 									tempOpIL.pcValue = "true"
 								}
 								compileWarning(funcName, "useless calculation, two const strings are given to and operation.")
