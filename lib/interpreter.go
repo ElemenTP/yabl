@@ -12,15 +12,15 @@ func init() {
 
 //Show a error message of compiler and exit
 func interpreteError(fname, msg string) {
-	log.Fatalln("Interpreter: Error in", fname, msg)
+	log.Fatalln("[Interpreter] Error in func", fname, ":", msg)
 }
 
 //Show a warning message of compiler
 func interpreteWarning(fname, msg string) {
-	log.Println("Interpreter: Warning in", fname, msg)
+	log.Println("[Interpreter] Warning in func", fname, ":", msg)
 }
 
 //Show a info message of compiler
 func interpreteInfo(fname, msg string) {
-	log.Println("Interpreter: Info in", fname, msg)
+	log.Println("[Interpreter] Info in func", fname, ":", msg)
 }
