@@ -5,40 +5,6 @@ import (
 	"strings"
 )
 
-type LexType int
-
-const (
-	lex_Variable = iota
-	lex_Function
-	lex_Keyword
-	lex_Constant
-)
-
-type LexElem struct {
-	lexType LexType
-	content string
-}
-type OpType int
-
-const (
-	op_if = iota
-	op_fi
-	op_loop
-	op_pool
-	op_invoke
-	op_getmsg
-	op_postmsg
-	op_and
-	op_or
-	op_not
-	op_join
-)
-
-type Operation struct {
-	opType OpType
-	opElem []LexElem
-}
-
 var (
 	Script     map[string]interface{}
 	mainExists bool = false
@@ -49,11 +15,6 @@ func init() {
 }
 
 func Compile() {
-	funcTypoCheck()
-}
-
-//check functions if exists one and only one main function and if functions are valid.
-func funcTypoCheck() {
 	for k, v := range Script {
 		spiltkey := strings.Fields(k)
 		funcName := spiltkey[0] + " " + spiltkey[1]
@@ -82,7 +43,13 @@ func funcTypoCheck() {
 						compileError(funcName, "wrong function structure.")
 					}
 				}
-				funcMapStr[k] = strslice
+
+				//compile string script to IL
+				tempFuncIL := Function{spiltkey[2:], make([]Operation, 0, len(strslice))}
+				for _, s := range strslice {
+					spiltstr := strings.Fields(s)
+				}
+				IL[spiltkey[1]] = tempFuncIL
 				compileInfo(funcName, "identified function.")
 			default:
 				compileError(funcName, "wrong function structure.")
