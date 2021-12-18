@@ -73,4 +73,6 @@ func (w *WsServer) connHandle(conn *websocket.Conn) {
 	defer func() {
 		conn.Close()
 	}()
+	params := make(map[string]string)
+	funcInvoker("main", &params, conn)
 }

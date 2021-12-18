@@ -391,8 +391,11 @@ func Compile() {
 							compileWarning(funcName, "more than one variable is given to return operation, ignore all but first.")
 						}
 						switch tempOpIL.opElem[1].lexType {
+						case lex_Constant:
+							tempOpIL.haspc = true
+							tempOpIL.pcValue = tempOpIL.opElem[1].content
 						case lex_Keyword:
-							compileError(funcName, "condition given to if operation is a keyword "+tempOpIL.opElem[1].content+".")
+							compileError(funcName, "condition given to return operation is a keyword "+tempOpIL.opElem[1].content+".")
 						}
 
 					case op_equal:
@@ -445,7 +448,7 @@ func Compile() {
 					case op_and:
 						/*
 							op_and
-							____	____	and	____
+							____	____	and		____
 							assign	param1	op		param2
 						*/
 						prefix := 0
@@ -853,6 +856,12 @@ func Compile() {
 
 					}
 					tempFuncIL.ops = append(tempFuncIL.ops, tempOpIL)
+				}
+				if branchStack.Len() != 0 {
+					compileError(funcName, "if-fi block is not closed")
+				}
+				if cycleStack.Len() != 0 {
+					compileError(funcName, "loop block is not closed")
 				}
 				compileInfo(funcName, "identified function.")
 				if _, ok := IL[funcName]; ok {
