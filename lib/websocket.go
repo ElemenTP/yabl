@@ -71,8 +71,14 @@ func (w *WsServer) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 //handle a websocket connection
 func (w *WsServer) connHandle(conn *websocket.Conn) {
 	defer func() {
-		conn.Close()
+		err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+		if err != nil {
+			log.Println("write close:", err)
+			return
+		}
+		log.Panicln("Client disconnect ", conn.RemoteAddr())
 	}()
-	params := make(map[string]string)
+
+	params := make([]string, 0)
 	funcInvoker("main", &params, conn)
 }

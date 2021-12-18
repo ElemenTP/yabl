@@ -1,8 +1,11 @@
 package lib
 
 import (
+	"fmt"
 	"log"
+	"net"
 	"strings"
+	"time"
 	"yabl/stack"
 
 	"github.com/gorilla/websocket"
@@ -24,18 +27,18 @@ type FuncField struct {
 }
 
 //a invoker of yabl functions
-func funcInvoker(funcName string, params *map[string]string, conn *websocket.Conn) string {
+func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string {
 	n, ok := IL[funcName]
 	if !ok {
 		interpreteError(funcName, "can not find a function with name this name.")
 	}
 	f := FuncField{0, stack.NewStack(), stack.NewStack(), make(map[string]string)}
-	for _, k := range n.params {
-		v, ok := (*params)[k]
-		if !ok {
+	for i, k := range n.params {
+		if i >= len(*params) {
 			interpreteError(funcName, "can not fetch the param "+k+".")
+		} else {
+			f.localVar[k] = (*params)[i]
 		}
-		f.localVar[k] = v
 	}
 	funcLen := len(n.ops)
 	for {
@@ -169,7 +172,7 @@ func funcInvoker(funcName string, params *map[string]string, conn *websocket.Con
 				case op_loop:
 					f.cycleStack.Push(op_loop)
 				case op_pool:
-					f.branchStack.Pop()
+					f.cycleStack.Pop()
 					if f.cycleStack.Len() == curpos-1 {
 						break find4
 					}
@@ -298,6 +301,27 @@ func funcInvoker(funcName string, params *map[string]string, conn *websocket.Con
 			}
 
 		case op_not:
+			if tOp.assignment {
+				res := ""
+				if tOp.haspc {
+					res = tOp.pcValue
+				} else {
+					a := ""
+					switch tOp.opElem[2].lexType {
+					case lex_Identifier:
+						ta, ok := f.localVar[tOp.opElem[2].content]
+						if !ok {
+							interpreteError(funcName, "can not find variable "+tOp.opElem[2].content)
+						}
+						a = ta
+					}
+					if a == "" {
+						res = "true"
+					}
+				}
+				f.localVar[tOp.opElem[0].content] = res
+			}
+
 		case op_join:
 			if tOp.assignment {
 				res := ""
@@ -433,9 +457,49 @@ func funcInvoker(funcName string, params *map[string]string, conn *websocket.Con
 			}
 
 		case op_invoke:
+			prefix := 0
+			if tOp.assignment {
+				prefix = 1
+			}
+			paramlen := len(tOp.opElem) - 2 - prefix
+			params := make([]string, 0, paramlen)
+			for _, p := range tOp.opElem[2+prefix:] {
+				switch p.lexType {
+				case lex_Constant:
+					params = append(params, p.content)
+				case lex_Identifier:
+					res, ok := f.localVar[p.content]
+					if !ok {
+						interpreteError(funcName, "can not find variable "+tOp.opElem[3].content)
+					}
+					params = append(params, res)
+				}
+			}
+			value := funcInvoker(tOp.opElem[1+prefix].content, &params, conn)
+			if tOp.assignment {
+				f.localVar[tOp.opElem[0].content] = value
+			}
 
 		case op_getmsg:
+			recvmsg := getmsg(conn)
+			if tOp.assignment {
+				f.localVar[tOp.opElem[0].content] = recvmsg
+			}
+
 		case op_postmsg:
+			sendmsg := ""
+			switch tOp.opElem[1].lexType {
+			case lex_Constant:
+				sendmsg = tOp.opElem[1].content
+			case lex_Identifier:
+				res, ok := f.localVar[tOp.opElem[1].content]
+				if !ok {
+					interpreteError(funcName, "can not find variable "+tOp.opElem[1].content)
+				}
+				sendmsg = res
+			}
+			postmsg(sendmsg, conn)
+
 		default:
 			interpreteWarning(funcName, "unknown operation, skipping.")
 		}
@@ -444,6 +508,44 @@ func funcInvoker(funcName string, params *map[string]string, conn *websocket.Con
 			return ""
 		}
 	}
+}
+
+type MsgStruct struct {
+	Timestamp int64  `json:"timestamp"`
+	Content   string `json:"content"`
+}
+
+func getmsg(conn *websocket.Conn) string {
+	conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(600))) //close connection after 600s
+	recvmsg := new(MsgStruct)
+	err := conn.ReadJSON(&recvmsg)
+	if err != nil {
+		if netErr, ok := err.(net.Error); ok {
+			if netErr.Timeout() {
+				interpreteError("getmsg", "websocket receive message from "+conn.RemoteAddr().String()+" timeout")
+			}
+		}
+		interpreteError("getmsg", fmt.Sprintf("websocket receive message from %v error: %v \n", conn.RemoteAddr(), err))
+	}
+	interpreteInfo("getmsg", "receive message from "+conn.RemoteAddr().String())
+	return recvmsg.Content
+}
+
+func postmsg(content string, conn *websocket.Conn) {
+	conn.SetWriteDeadline(time.Now().Add(time.Second * time.Duration(600))) //close connection after 600s
+	sendmsg := new(MsgStruct)
+	sendmsg.Timestamp = time.Now().Unix()
+	sendmsg.Content = content
+	err := conn.WriteJSON(&sendmsg)
+	if err != nil {
+		if netErr, ok := err.(net.Error); ok {
+			if netErr.Timeout() {
+				interpreteError("postmsg", "websocket send message to "+conn.RemoteAddr().String()+" timeout")
+			}
+		}
+		interpreteError("postmsg", fmt.Sprintf("websocket send message to %v error: %v \n", conn.RemoteAddr(), err))
+	}
+	interpreteInfo("postmsg", "send message to "+conn.RemoteAddr().String())
 }
 
 //Show a error message of interpreter and exit

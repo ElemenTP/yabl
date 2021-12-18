@@ -72,8 +72,6 @@ func main:
   - pool
   - fi
   - postmsg answer
-  - loop
-  - pool
 
 func test answer:
   - temp = answer join "世界\n"

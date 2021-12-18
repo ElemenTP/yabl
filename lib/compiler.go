@@ -835,8 +835,8 @@ func Compile() {
 					case op_postmsg:
 						/*
 							op_postmsg
-							____	postmsg	____
-							assign	op		param1
+							postmsg	____
+							op		param1
 						*/
 						if hasAssign {
 							compileError(funcName, "can not assign a postmsg operation.")
