@@ -4,6 +4,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -40,12 +41,12 @@ func NewWsServer(address string, lnet string) *WsServer {
 func (w *WsServer) Start() {
 	listener, err := net.Listen(w.lnet, w.address)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatalln("[Server] Error : shutting server", err)
 	}
 	w.listener = listener
-	log.Println("Listening address ", listener.Addr().String())
+	log.Println("[Server] Info : listening address", listener.Addr().String())
 	if err := http.Serve(w.listener, w); err != nil {
-		log.Fatalln("Shutting server ", err)
+		log.Fatalln("[Server] Error : shutting server", err)
 	}
 }
 
@@ -54,29 +55,27 @@ func (w *WsServer) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/ws" {
 		httpCode := http.StatusNotFound
 		reasePhrase := http.StatusText(httpCode)
-		log.Println("Path error ", reasePhrase)
+		log.Println("[Server] Error : path error", reasePhrase)
 		http.Error(rw, reasePhrase, httpCode)
 		return
 	}
 
 	conn, err := w.upgrade.Upgrade(rw, r, nil)
 	if err != nil {
-		log.Println("Websocket error ", err)
+		log.Println("[Server] Error", err)
 		return
 	}
-	log.Println("Client connect ", conn.RemoteAddr())
+	log.Println("[Server] Info : client connect", conn.RemoteAddr())
 	go w.connHandle(conn)
 }
 
 //handle a websocket connection
 func (w *WsServer) connHandle(conn *websocket.Conn) {
 	defer func() {
-		err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-		if err != nil {
-			log.Println("write close:", err)
-			return
-		}
-		log.Panicln("Client disconnect ", conn.RemoteAddr())
+		recover()
+		conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+		<-time.After(time.Second)
+		log.Println("[Server] Info : client disconnect", conn.RemoteAddr())
 	}()
 
 	params := make([]string, 0)

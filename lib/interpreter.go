@@ -481,7 +481,7 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 			}
 
 		case op_getmsg:
-			recvmsg := getmsg(conn)
+			recvmsg := getMsg(conn)
 			if tOp.assignment {
 				f.localVar[tOp.opElem[0].content] = recvmsg
 			}
@@ -498,7 +498,7 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 				}
 				sendmsg = res
 			}
-			postmsg(sendmsg, conn)
+			postMsg(sendmsg, conn)
 
 		default:
 			interpreteWarning(funcName, "unknown operation, skipping.")
@@ -515,7 +515,7 @@ type MsgStruct struct {
 	Content   string `json:"content"`
 }
 
-func getmsg(conn *websocket.Conn) string {
+func getMsg(conn *websocket.Conn) string {
 	conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(600))) //close connection after 600s
 	recvmsg := new(MsgStruct)
 	err := conn.ReadJSON(&recvmsg)
@@ -525,13 +525,16 @@ func getmsg(conn *websocket.Conn) string {
 				interpreteError("getmsg", "websocket receive message from "+conn.RemoteAddr().String()+" timeout")
 			}
 		}
-		interpreteError("getmsg", fmt.Sprintf("websocket receive message from %v error: %v \n", conn.RemoteAddr(), err))
+		if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+			interpreteError("getmsg", fmt.Sprintf("websocket receive message from %v error: %v \n", conn.RemoteAddr(), err))
+		}
+		panic("[Server] Info : client disconnect")
 	}
 	interpreteInfo("getmsg", "receive message from "+conn.RemoteAddr().String())
 	return recvmsg.Content
 }
 
-func postmsg(content string, conn *websocket.Conn) {
+func postMsg(content string, conn *websocket.Conn) {
 	conn.SetWriteDeadline(time.Now().Add(time.Second * time.Duration(600))) //close connection after 600s
 	sendmsg := new(MsgStruct)
 	sendmsg.Timestamp = time.Now().Unix()
@@ -543,7 +546,10 @@ func postmsg(content string, conn *websocket.Conn) {
 				interpreteError("postmsg", "websocket send message to "+conn.RemoteAddr().String()+" timeout")
 			}
 		}
-		interpreteError("postmsg", fmt.Sprintf("websocket send message to %v error: %v \n", conn.RemoteAddr(), err))
+		if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+			interpreteError("postmsg", fmt.Sprintf("websocket send message to %v error: %v \n", conn.RemoteAddr(), err))
+		}
+		panic("[Server] Info : client disconnect")
 	}
 	interpreteInfo("postmsg", "send message to "+conn.RemoteAddr().String())
 }

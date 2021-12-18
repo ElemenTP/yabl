@@ -23,7 +23,7 @@ var tryCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		//exit when no script file was specified.
 		if iptScript == "" {
-			log.Fatalln("No script file was specified, existing...")
+			log.Fatalln("[Server] Error : no script file was specified, existing...")
 		}
 
 		//read scripts from file
@@ -35,7 +35,7 @@ var tryCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalln(err)
 		}
-		log.Println("Read script from ", iptScript)
+		log.Println("[Server] Info : read script from", iptScript)
 
 		//compile script
 		lib.Compile()
