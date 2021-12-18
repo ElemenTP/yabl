@@ -1,6 +1,11 @@
 package lib
 
-import "log"
+import (
+	"log"
+	"yabl/stack"
+
+	"github.com/gorilla/websocket"
+)
 
 var (
 	IL map[string]Function
@@ -8,6 +13,30 @@ var (
 
 func init() {
 	IL = make(map[string]Function)
+}
+
+type FuncField struct {
+	PCp         int               //PC pointer
+	branchStack *stack.Stack      //stack to handle branch
+	cycleStack  *stack.Stack      //stack to handle cycle
+	localVar    map[string]string //local variables
+}
+
+//a invoker of yabl functions
+func funcInvoker(funcName string, params *map[string]string, conn *websocket.Conn) {
+	n, ok := IL[funcName]
+	if !ok {
+		interpreteError(funcName, "can not find a function with name this name.")
+	}
+	f := FuncField{0, stack.NewStack(), stack.NewStack(), make(map[string]string)}
+	for _, k := range n.params {
+		v, ok := (*params)[k]
+		if !ok {
+			interpreteError(funcName, "can not fetch the param "+k+".")
+		}
+		f.localVar[k] = v
+	}
+
 }
 
 //Show a error message of compiler and exit

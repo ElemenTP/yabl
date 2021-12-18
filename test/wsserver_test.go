@@ -9,8 +9,8 @@ import (
 var testserver *lib.WsServer
 
 func init() {
-	testserver = lib.NewWsServer("127.0.0.1:12580", "tcp")
-	go testserver.Start()
+	// testserver = lib.NewWsServer("127.0.0.1:12580", "tcp")
+	// go testserver.Start()
 }
 
 func Test_Httphandle(t *testing.T) {

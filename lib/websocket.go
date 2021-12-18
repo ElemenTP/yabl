@@ -15,6 +15,7 @@ type WsServer struct {
 	upgrade  *websocket.Upgrader
 }
 
+//construct a new websocket server struct
 func NewWsServer(address string, lnet string) *WsServer {
 	ws := new(WsServer)
 	ws.address = address
@@ -35,6 +36,7 @@ func NewWsServer(address string, lnet string) *WsServer {
 	return ws
 }
 
+//websocket server begin listen and serve.
 func (w *WsServer) Start() {
 	listener, err := net.Listen(w.lnet, w.address)
 	if err != nil {
@@ -47,6 +49,7 @@ func (w *WsServer) Start() {
 	}
 }
 
+//judge if a connection is valid and upgrade http to websocket
 func (w *WsServer) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/ws" {
 		httpCode := http.StatusNotFound
@@ -65,6 +68,7 @@ func (w *WsServer) ServeHTTP(rw http.ResponseWriter, r *http.Request) {
 	go w.connHandle(conn)
 }
 
+//handle a websocket connection
 func (w *WsServer) connHandle(conn *websocket.Conn) {
 	defer func() {
 		conn.Close()
