@@ -62,7 +62,7 @@ func main:
 		fmt.Println(err)
 		t.FailNow()
 	}
-	fmt.Println(time.Unix(recvmsg.Timestamp, 0).Format("2006-01-02 15:04:05"), recvmsg.Content)
+	fmt.Println(time.Unix(recvmsg.Timestamp, 0).Format(time.RFC3339), recvmsg.Content)
 }
 
 func Test_Websockethandles(t *testing.T) {
