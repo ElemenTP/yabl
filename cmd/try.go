@@ -21,12 +21,12 @@ var tryCmd = &cobra.Command{
 	Short: "Check script validity",
 	Long:  "Try to compile the script, check its validity",
 	Run: func(cmd *cobra.Command, args []string) {
-		//exit when no script file was specified.
+		//Exit when no script file was specified.
 		if iptScript == "" {
 			log.Fatalln("[Server] Error : no script file was specified, existing...")
 		}
 
-		//read scripts from file
+		//Read scripts from file.
 		yamlFile, err := ioutil.ReadFile(iptScript)
 		if err != nil {
 			log.Fatalln(err)
@@ -37,7 +37,7 @@ var tryCmd = &cobra.Command{
 		}
 		log.Println("[Server] Info : read script from", iptScript)
 
-		//compile script
+		//Compile script.
 		lib.Compile()
 	},
 }

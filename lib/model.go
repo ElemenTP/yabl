@@ -4,7 +4,7 @@ var (
 	keywordMap map[string]OpType //a string to op code mapping, to simplify keyword identifing
 )
 
-//type of lexical elements
+//Type of lexical elements.
 type LexType int
 
 const (
@@ -13,13 +13,13 @@ const (
 	lex_Constant
 )
 
-//a struct to contain lexical elements
+//A struct to contain lexical elements.
 type LexElem struct {
-	lexType LexType //type of the lexical elements
-	content string  //content of the lexical elements
+	LT      LexType //type of the lexical elements
+	Content string  //content of the lexical elements
 }
 
-//type of operations.
+//Type of operations.
 type OpType int
 
 const (
@@ -46,20 +46,20 @@ const (
 	op_postmsg
 )
 
-//a struct to contain operations
+//A struct to contain operations.
 type Operation struct {
-	opType     OpType    //type of the operation
-	haspc      bool      //if the result of the operation is precompiled
-	pcValue    string    //value of precompiled value
-	assignment bool      //if the operation has assignment
-	opLocation int       //location of the operation element, only used in compiling.
-	opElem     []LexElem //slice of lexical elements composed of the operation.
+	OT       OpType    //type of the operation
+	IsPC     bool      //if the result of the operation is precompiled
+	PCValue  string    //value of precompiled value
+	IsAssign bool      //if the operation has assignment
+	OpLoc    int       //location of the operation element, only used in compiling.
+	OpElem   []LexElem //slice of lexical elements composed of the operation.
 }
 
-//a struct to contain functions
+//A struct to contain functions.
 type Function struct {
-	params []string    //param slice to give to the function
-	ops    []Operation //slice of operations composed of the function.
+	Params   []string    //param slice to give to the function
+	FuncElem []Operation //slice of operations composed of the function.
 }
 
 func init() {
@@ -87,8 +87,8 @@ func init() {
 	}
 }
 
-//use the string-opcode map to identify keywords
-func getOpType(content string) OpType {
+//Use the string-opcode map to identify keywords.
+func GetOpType(content string) OpType {
 	res, ok := keywordMap[content]
 	if ok {
 		return OpType(res)

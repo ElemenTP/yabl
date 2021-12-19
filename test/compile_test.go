@@ -51,30 +51,25 @@ func test answer:
 
 func Test_Compile2(t *testing.T) {
 	scriptstr := `
-#!/Users/elementp/Documents/Projects/yabl/bin/yabl-darwin-amd64 -s
-name: ass
-address: 0.0.0.0
-port: 11934
+#test script 2
+address: 127.0.0.1
+port: 8080
 func main:
-  - answer = "你好，"
-  - answer = invoke test answer
-  - answer = answer and "test"
-  - if answer
-  - counter = ""
+  - hello = "你好，"
+  - hello = invoke joinfunc hello
+  - postmsg hello
   - loop
-  - counter = counter join "0"
-  - breakloop = counter equal "000000"
-  - if breakloop
+  - answer = getmsg
+  - flag = answer equal "测试"
+  - if flag
   - break
-  - else
-  - continue
   - fi
+  - postmsg "试试告诉我测试"
   - pool
-  - fi
-  - postmsg answer
+  - postmsg "测试结束，再见"
 
-func test answer:
-  - temp = answer join "世界\n"
+func joinfunc hello:
+  - temp = hello join "世界"
   - return temp`
 
 	genScript([]byte(scriptstr))
@@ -83,33 +78,29 @@ func test answer:
 
 func Test_Compile3(t *testing.T) {
 	scriptstr := `
-#!/Users/elementp/Documents/Projects/yabl/bin/yabl-darwin-amd64 -s
-name: ass
-address: 0.0.0.0
-port: 11934
+#test script 3
+address: 127.0.0.1
+port: 8080
 func main:
-  - answer = "你好，"
-  - answer = invoke test answer
-  - answer = answer and "test"
-  - if answer
-  - counter = ""
+  - hello = "亲亲，我是疼殉客服机器人小美，有什么问题尽管问我吧！"
+  - postmsg hello
+  - flag1 = ""
   - loop
-  - counter = counter join "0"
-  - breakloop = counter equal "000000"
-  - if breakloop
+  - loop
+  - answer = getmsg
+  - flag2 = answer contain "跳楼"
+  - if flag2
   - break
-  - else
-  - continue
+  - fi
+  - postmsg "亲亲，您不要生气呢，这边正在尝试解决，可以多等待几天看看呢。"
+  - pool
+  - flag1 = flag1 join "0"
+  - flag3 = flag1 equal "000"
+  - if flag3
+  - break
   - fi
   - pool
-  - fi
-  - postmsg answer
-  - loop
-  - pool
-
-func test answer:
-  - temp = answer join "世界\n"
-  - return temp`
+  - postmsg "亲亲，正在为您接入人工客服呢。"`
 
 	genScript([]byte(scriptstr))
 	lib.Compile()

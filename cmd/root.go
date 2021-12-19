@@ -21,12 +21,12 @@ var (
 		Run: func(cmd *cobra.Command, args []string) {
 			flags := cmd.Flags()
 
-			//exit when no script file was specified.
+			//Exit when no script file was specified.
 			if iptScript == "" {
 				log.Fatalln("[Server] Error : no script file was specified, existing...")
 			}
 
-			//read scripts from file
+			//Read scripts from file.
 			yamlFile, err := ioutil.ReadFile(iptScript)
 			if err != nil {
 				log.Fatalln(err)
@@ -37,10 +37,10 @@ var (
 			}
 			log.Println("[Server] Info : read script from", iptScript)
 
-			//compile script
+			//Compile script.
 			lib.Compile()
 
-			//parse server settings from script and flags.
+			//Parse server settings from script and flags.
 			var laddr string //listen address
 			laddr, err = flags.GetString("address")
 			if err != nil {
@@ -78,14 +78,14 @@ var (
 				lnet = "tcp"
 			}
 
-			//start a websocket server
+			//Start a websocket server.
 			ws := lib.NewWsServer(laddr, lnet)
 			ws.Start()
 		},
 	}
 )
 
-// Execute executes the commands.
+//Execute executes the commands.
 func Execute() {
 	err := rootCmd.Execute()
 	if err != nil {

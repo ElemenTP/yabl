@@ -12,88 +12,98 @@ import (
 )
 
 var (
-	IL map[string]Function
+	IL map[string]Function //compiled script in IL for interpreter
 )
 
 func init() {
 	IL = make(map[string]Function)
 }
 
+//Field of a function, contains PC pointer, local variables
+//, a stack to handle branch and a stack to handle cycle.
 type FuncField struct {
 	PCp         int               //PC pointer
-	branchStack *stack.Stack      //stack to handle branch
-	cycleStack  *stack.Stack      //stack to handle cycle
-	localVar    map[string]string //local variables
+	BranchStack *stack.Stack      //stack to handle branch
+	CycleStack  *stack.Stack      //stack to handle cycle
+	LocalVar    map[string]string //local variables
 }
 
-//a invoker of yabl functions
-func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string {
+//An invoker of yabl functions.
+func FuncInvoker(funcName string, params *[]string, conn *websocket.Conn) string {
 	n, ok := IL[funcName]
 	if !ok {
-		interpreteError(funcName, "can not find a function with name this name.")
+		InterpreteError(funcName, "can not find a function with name this name.")
 	}
-	f := FuncField{0, stack.NewStack(), stack.NewStack(), make(map[string]string)}
-	for i, k := range n.params {
-		if i >= len(*params) {
-			interpreteError(funcName, "can not fetch the param "+k+".")
+	provideLen, neededLen := len(*params), len(n.Params)
+	if provideLen > neededLen {
+		if neededLen == 0 {
+			InterpreteError(funcName, "no param is needed, but params are provided.")
 		} else {
-			f.localVar[k] = (*params)[i]
+			InterpreteWarning(funcName, "more params than needed is provided, ignoring.")
 		}
 	}
-	funcLen := len(n.ops)
+	f := FuncField{0, stack.NewStack(), stack.NewStack(), make(map[string]string)}
+	for i, k := range n.Params {
+		if i >= provideLen {
+			InterpreteError(funcName, "can not fetch the param "+k+".")
+		} else {
+			f.LocalVar[k] = (*params)[i]
+		}
+	}
+	funcLen := len(n.FuncElem)
 	for {
-		tOp := &n.ops[f.PCp]
-		switch tOp.opType {
+		tOp := &n.FuncElem[f.PCp]
+		switch tOp.OT {
 		case op_null:
-			if tOp.assignment {
-				switch tOp.opElem[1].lexType {
+			if tOp.IsAssign {
+				switch tOp.OpElem[1].LT {
 				case lex_Constant:
-					f.localVar[tOp.opElem[0].content] = tOp.opElem[1].content
+					f.LocalVar[tOp.OpElem[0].Content] = tOp.OpElem[1].Content
 				case lex_Identifier:
-					res, ok := f.localVar[tOp.opElem[1].content]
+					res, ok := f.LocalVar[tOp.OpElem[1].Content]
 					if !ok {
-						interpreteError(funcName, "can not find variable "+tOp.opElem[1].content)
+						InterpreteError(funcName, "can not find variable "+tOp.OpElem[1].Content)
 					} else {
-						f.localVar[tOp.opElem[0].content] = res
+						f.LocalVar[tOp.OpElem[0].Content] = res
 					}
 				}
 			}
 
 		case op_if:
 			res := false
-			if tOp.haspc {
-				res = len(tOp.pcValue) > 0
+			if tOp.IsPC {
+				res = len(tOp.PCValue) > 0
 			} else {
-				a, ok := f.localVar[tOp.opElem[1].content]
+				a, ok := f.LocalVar[tOp.OpElem[1].Content]
 				if !ok {
-					interpreteError(funcName, "can not find variable "+tOp.opElem[1].content)
+					InterpreteError(funcName, "can not find variable "+tOp.OpElem[1].Content)
 				} else {
 					res = len(a) > 0
 				}
 			}
-			f.branchStack.Push(op_if)
+			f.BranchStack.Push(op_if)
 			if !res {
-				curpos := f.branchStack.Len()
+				curpos := f.BranchStack.Len()
 				f.PCp += 1
 			find1:
 				for {
-					switch n.ops[f.PCp].opType {
+					switch n.FuncElem[f.PCp].OT {
 					case op_if:
-						f.branchStack.Push(op_if)
+						f.BranchStack.Push(op_if)
 					case op_else:
-						if f.branchStack.Len() == curpos {
+						if f.BranchStack.Len() == curpos {
 							break find1
 						}
 					case op_elif:
-						if f.branchStack.Len() == curpos {
+						if f.BranchStack.Len() == curpos {
 							ress := false
-							tOpp := &n.ops[f.PCp]
-							if tOpp.haspc {
-								ress = len(tOpp.pcValue) > 0
+							tOpp := &n.FuncElem[f.PCp]
+							if tOpp.IsPC {
+								ress = len(tOpp.PCValue) > 0
 							} else {
-								a, ok := f.localVar[tOpp.opElem[1].content]
+								a, ok := f.LocalVar[tOpp.OpElem[1].Content]
 								if !ok {
-									interpreteError(funcName, "can not find variable "+tOpp.opElem[1].content)
+									InterpreteError(funcName, "can not find variable "+tOpp.OpElem[1].Content)
 								} else {
 									ress = len(a) > 0
 								}
@@ -103,8 +113,8 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 							}
 						}
 					case op_fi:
-						f.branchStack.Pop()
-						if f.branchStack.Len() == curpos-1 {
+						f.BranchStack.Pop()
+						if f.BranchStack.Len() == curpos-1 {
 							break find1
 						}
 					}
@@ -113,16 +123,16 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 			}
 
 		case op_else:
-			curpos := f.branchStack.Len()
+			curpos := f.BranchStack.Len()
 			f.PCp += 1
 		find2:
 			for {
-				switch n.ops[f.PCp].opType {
+				switch n.FuncElem[f.PCp].OT {
 				case op_if:
-					f.branchStack.Push(op_if)
+					f.BranchStack.Push(op_if)
 				case op_fi:
-					f.branchStack.Pop()
-					if f.branchStack.Len() == curpos-1 {
+					f.BranchStack.Pop()
+					if f.BranchStack.Len() == curpos-1 {
 						break find2
 					}
 				}
@@ -130,16 +140,16 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 			}
 
 		case op_elif:
-			curpos := f.branchStack.Len()
+			curpos := f.BranchStack.Len()
 			f.PCp += 1
 		find3:
 			for {
-				switch n.ops[f.PCp].opType {
+				switch n.FuncElem[f.PCp].OT {
 				case op_if:
-					f.branchStack.Push(op_if)
+					f.BranchStack.Push(op_if)
 				case op_fi:
-					f.branchStack.Pop()
-					if f.branchStack.Len() == curpos-1 {
+					f.BranchStack.Pop()
+					if f.BranchStack.Len() == curpos-1 {
 						break find3
 					}
 				}
@@ -149,31 +159,31 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 		case op_fi:
 
 		case op_loop:
-			f.cycleStack.Push(f.PCp)
+			f.CycleStack.Push(f.PCp)
 
 		case op_pool:
-			switch value := f.cycleStack.Peek().(type) {
+			switch value := f.CycleStack.Peek().(type) {
 			case int:
 				f.PCp = value
 			}
 
 		case op_continue:
-			switch value := f.cycleStack.Peek().(type) {
+			switch value := f.CycleStack.Peek().(type) {
 			case int:
 				f.PCp = value
 			}
 
 		case op_break:
-			curpos := f.cycleStack.Len()
+			curpos := f.CycleStack.Len()
 			f.PCp += 1
 		find4:
 			for {
-				switch n.ops[f.PCp].opType {
+				switch n.FuncElem[f.PCp].OT {
 				case op_loop:
-					f.cycleStack.Push(op_loop)
+					f.CycleStack.Push(op_loop)
 				case op_pool:
-					f.cycleStack.Pop()
-					if f.cycleStack.Len() == curpos-1 {
+					f.CycleStack.Pop()
+					if f.CycleStack.Len() == curpos-1 {
 						break find4
 					}
 				}
@@ -181,16 +191,16 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 			}
 
 		case op_return:
-			if len(tOp.opElem) == 1 {
+			if len(tOp.OpElem) == 1 {
 				return ""
 			} else {
 				res := ""
-				if tOp.haspc {
-					res = tOp.pcValue
+				if tOp.IsPC {
+					res = tOp.PCValue
 				} else {
-					a, ok := f.localVar[tOp.opElem[1].content]
+					a, ok := f.LocalVar[tOp.OpElem[1].Content]
 					if !ok {
-						interpreteError(funcName, "can not find variable "+tOp.opElem[1].content)
+						InterpreteError(funcName, "can not find variable "+tOp.OpElem[1].Content)
 					} else {
 						res = a
 					}
@@ -199,29 +209,29 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 			}
 
 		case op_equal:
-			if tOp.assignment {
+			if tOp.IsAssign {
 				res := ""
-				if tOp.haspc {
-					res = tOp.pcValue
+				if tOp.IsPC {
+					res = tOp.PCValue
 				} else {
 					a, b := "", ""
-					switch tOp.opElem[1].lexType {
+					switch tOp.OpElem[1].LT {
 					case lex_Constant:
-						a = tOp.opElem[1].content
+						a = tOp.OpElem[1].Content
 					case lex_Identifier:
-						ta, ok := f.localVar[tOp.opElem[1].content]
+						ta, ok := f.LocalVar[tOp.OpElem[1].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[1].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[1].Content)
 						}
 						a = ta
 					}
-					switch tOp.opElem[3].lexType {
+					switch tOp.OpElem[3].LT {
 					case lex_Constant:
-						b = tOp.opElem[3].content
+						b = tOp.OpElem[3].Content
 					case lex_Identifier:
-						tb, ok := f.localVar[tOp.opElem[3].content]
+						tb, ok := f.LocalVar[tOp.OpElem[3].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[3].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[3].Content)
 						}
 						b = tb
 					}
@@ -229,33 +239,33 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 						res = "true"
 					}
 				}
-				f.localVar[tOp.opElem[0].content] = res
+				f.LocalVar[tOp.OpElem[0].Content] = res
 			}
 
 		case op_and:
-			if tOp.assignment {
+			if tOp.IsAssign {
 				res := ""
-				if tOp.haspc {
-					res = tOp.pcValue
+				if tOp.IsPC {
+					res = tOp.PCValue
 				} else {
 					a, b := "", ""
-					switch tOp.opElem[1].lexType {
+					switch tOp.OpElem[1].LT {
 					case lex_Constant:
-						a = tOp.opElem[1].content
+						a = tOp.OpElem[1].Content
 					case lex_Identifier:
-						ta, ok := f.localVar[tOp.opElem[1].content]
+						ta, ok := f.LocalVar[tOp.OpElem[1].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[1].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[1].Content)
 						}
 						a = ta
 					}
-					switch tOp.opElem[3].lexType {
+					switch tOp.OpElem[3].LT {
 					case lex_Constant:
-						b = tOp.opElem[3].content
+						b = tOp.OpElem[3].Content
 					case lex_Identifier:
-						tb, ok := f.localVar[tOp.opElem[3].content]
+						tb, ok := f.LocalVar[tOp.OpElem[3].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[3].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[3].Content)
 						}
 						b = tb
 					}
@@ -263,33 +273,33 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 						res = "true"
 					}
 				}
-				f.localVar[tOp.opElem[0].content] = res
+				f.LocalVar[tOp.OpElem[0].Content] = res
 			}
 
 		case op_or:
-			if tOp.assignment {
+			if tOp.IsAssign {
 				res := ""
-				if tOp.haspc {
-					res = tOp.pcValue
+				if tOp.IsPC {
+					res = tOp.PCValue
 				} else {
 					a, b := "", ""
-					switch tOp.opElem[1].lexType {
+					switch tOp.OpElem[1].LT {
 					case lex_Constant:
-						a = tOp.opElem[1].content
+						a = tOp.OpElem[1].Content
 					case lex_Identifier:
-						ta, ok := f.localVar[tOp.opElem[1].content]
+						ta, ok := f.LocalVar[tOp.OpElem[1].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[1].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[1].Content)
 						}
 						a = ta
 					}
-					switch tOp.opElem[3].lexType {
+					switch tOp.OpElem[3].LT {
 					case lex_Constant:
-						b = tOp.opElem[3].content
+						b = tOp.OpElem[3].Content
 					case lex_Identifier:
-						tb, ok := f.localVar[tOp.opElem[3].content]
+						tb, ok := f.LocalVar[tOp.OpElem[3].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[3].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[3].Content)
 						}
 						b = tb
 					}
@@ -297,21 +307,21 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 						res = "true"
 					}
 				}
-				f.localVar[tOp.opElem[0].content] = res
+				f.LocalVar[tOp.OpElem[0].Content] = res
 			}
 
 		case op_not:
-			if tOp.assignment {
+			if tOp.IsAssign {
 				res := ""
-				if tOp.haspc {
-					res = tOp.pcValue
+				if tOp.IsPC {
+					res = tOp.PCValue
 				} else {
 					a := ""
-					switch tOp.opElem[2].lexType {
+					switch tOp.OpElem[2].LT {
 					case lex_Identifier:
-						ta, ok := f.localVar[tOp.opElem[2].content]
+						ta, ok := f.LocalVar[tOp.OpElem[2].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[2].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[2].Content)
 						}
 						a = ta
 					}
@@ -319,65 +329,65 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 						res = "true"
 					}
 				}
-				f.localVar[tOp.opElem[0].content] = res
+				f.LocalVar[tOp.OpElem[0].Content] = res
 			}
 
 		case op_join:
-			if tOp.assignment {
+			if tOp.IsAssign {
 				res := ""
-				if tOp.haspc {
-					res = tOp.pcValue
+				if tOp.IsPC {
+					res = tOp.PCValue
 				} else {
 					a, b := "", ""
-					switch tOp.opElem[1].lexType {
+					switch tOp.OpElem[1].LT {
 					case lex_Constant:
-						a = tOp.opElem[1].content
+						a = tOp.OpElem[1].Content
 					case lex_Identifier:
-						ta, ok := f.localVar[tOp.opElem[1].content]
+						ta, ok := f.LocalVar[tOp.OpElem[1].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[1].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[1].Content)
 						}
 						a = ta
 					}
-					switch tOp.opElem[3].lexType {
+					switch tOp.OpElem[3].LT {
 					case lex_Constant:
-						b = tOp.opElem[3].content
+						b = tOp.OpElem[3].Content
 					case lex_Identifier:
-						tb, ok := f.localVar[tOp.opElem[3].content]
+						tb, ok := f.LocalVar[tOp.OpElem[3].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[3].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[3].Content)
 						}
 						b = tb
 					}
 					res = a + b
 				}
-				f.localVar[tOp.opElem[0].content] = res
+				f.LocalVar[tOp.OpElem[0].Content] = res
 			}
 
 		case op_contain:
-			if tOp.assignment {
+			if tOp.IsAssign {
 				res := ""
-				if tOp.haspc {
-					res = tOp.pcValue
+				if tOp.IsPC {
+					res = tOp.PCValue
 				} else {
 					a, b := "", ""
-					switch tOp.opElem[1].lexType {
+					switch tOp.OpElem[1].LT {
 					case lex_Constant:
-						a = tOp.opElem[1].content
+						a = tOp.OpElem[1].Content
 					case lex_Identifier:
-						ta, ok := f.localVar[tOp.opElem[1].content]
+						ta, ok := f.LocalVar[tOp.OpElem[1].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[1].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[1].Content)
 						}
 						a = ta
 					}
-					switch tOp.opElem[3].lexType {
+					switch tOp.OpElem[3].LT {
 					case lex_Constant:
-						b = tOp.opElem[3].content
+						b = tOp.OpElem[3].Content
 					case lex_Identifier:
-						tb, ok := f.localVar[tOp.opElem[3].content]
+						tb, ok := f.LocalVar[tOp.OpElem[3].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[3].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[3].Content)
 						}
 						b = tb
 					}
@@ -385,33 +395,33 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 						res = "true"
 					}
 				}
-				f.localVar[tOp.opElem[0].content] = res
+				f.LocalVar[tOp.OpElem[0].Content] = res
 			}
 
 		case op_hasprefix:
-			if tOp.assignment {
+			if tOp.IsAssign {
 				res := ""
-				if tOp.haspc {
-					res = tOp.pcValue
+				if tOp.IsPC {
+					res = tOp.PCValue
 				} else {
 					a, b := "", ""
-					switch tOp.opElem[1].lexType {
+					switch tOp.OpElem[1].LT {
 					case lex_Constant:
-						a = tOp.opElem[1].content
+						a = tOp.OpElem[1].Content
 					case lex_Identifier:
-						ta, ok := f.localVar[tOp.opElem[1].content]
+						ta, ok := f.LocalVar[tOp.OpElem[1].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[1].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[1].Content)
 						}
 						a = ta
 					}
-					switch tOp.opElem[3].lexType {
+					switch tOp.OpElem[3].LT {
 					case lex_Constant:
-						b = tOp.opElem[3].content
+						b = tOp.OpElem[3].Content
 					case lex_Identifier:
-						tb, ok := f.localVar[tOp.opElem[3].content]
+						tb, ok := f.LocalVar[tOp.OpElem[3].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[3].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[3].Content)
 						}
 						b = tb
 					}
@@ -419,33 +429,33 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 						res = "true"
 					}
 				}
-				f.localVar[tOp.opElem[0].content] = res
+				f.LocalVar[tOp.OpElem[0].Content] = res
 			}
 
 		case op_hassuffix:
-			if tOp.assignment {
+			if tOp.IsAssign {
 				res := ""
-				if tOp.haspc {
-					res = tOp.pcValue
+				if tOp.IsPC {
+					res = tOp.PCValue
 				} else {
 					a, b := "", ""
-					switch tOp.opElem[1].lexType {
+					switch tOp.OpElem[1].LT {
 					case lex_Constant:
-						a = tOp.opElem[1].content
+						a = tOp.OpElem[1].Content
 					case lex_Identifier:
-						ta, ok := f.localVar[tOp.opElem[1].content]
+						ta, ok := f.LocalVar[tOp.OpElem[1].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[1].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[1].Content)
 						}
 						a = ta
 					}
-					switch tOp.opElem[3].lexType {
+					switch tOp.OpElem[3].LT {
 					case lex_Constant:
-						b = tOp.opElem[3].content
+						b = tOp.OpElem[3].Content
 					case lex_Identifier:
-						tb, ok := f.localVar[tOp.opElem[3].content]
+						tb, ok := f.LocalVar[tOp.OpElem[3].Content]
 						if !ok {
-							interpreteError(funcName, "can not find variable "+tOp.opElem[3].content)
+							InterpreteError(funcName, "can not find variable "+tOp.OpElem[3].Content)
 						}
 						b = tb
 					}
@@ -453,55 +463,55 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 						res = "true"
 					}
 				}
-				f.localVar[tOp.opElem[0].content] = res
+				f.LocalVar[tOp.OpElem[0].Content] = res
 			}
 
 		case op_invoke:
 			prefix := 0
-			if tOp.assignment {
+			if tOp.IsAssign {
 				prefix = 1
 			}
-			paramlen := len(tOp.opElem) - 2 - prefix
+			paramlen := len(tOp.OpElem) - 2 - prefix
 			params := make([]string, 0, paramlen)
-			for _, p := range tOp.opElem[2+prefix:] {
-				switch p.lexType {
+			for _, p := range tOp.OpElem[2+prefix:] {
+				switch p.LT {
 				case lex_Constant:
-					params = append(params, p.content)
+					params = append(params, p.Content)
 				case lex_Identifier:
-					res, ok := f.localVar[p.content]
+					res, ok := f.LocalVar[p.Content]
 					if !ok {
-						interpreteError(funcName, "can not find variable "+tOp.opElem[3].content)
+						InterpreteError(funcName, "can not find variable "+tOp.OpElem[3].Content)
 					}
 					params = append(params, res)
 				}
 			}
-			value := funcInvoker(tOp.opElem[1+prefix].content, &params, conn)
-			if tOp.assignment {
-				f.localVar[tOp.opElem[0].content] = value
+			value := FuncInvoker(tOp.OpElem[1+prefix].Content, &params, conn)
+			if tOp.IsAssign {
+				f.LocalVar[tOp.OpElem[0].Content] = value
 			}
 
 		case op_getmsg:
-			recvmsg := getMsg(conn)
-			if tOp.assignment {
-				f.localVar[tOp.opElem[0].content] = recvmsg
+			recvmsg := GetMsg(conn)
+			if tOp.IsAssign {
+				f.LocalVar[tOp.OpElem[0].Content] = recvmsg
 			}
 
 		case op_postmsg:
 			sendmsg := ""
-			switch tOp.opElem[1].lexType {
+			switch tOp.OpElem[1].LT {
 			case lex_Constant:
-				sendmsg = tOp.opElem[1].content
+				sendmsg = tOp.OpElem[1].Content
 			case lex_Identifier:
-				res, ok := f.localVar[tOp.opElem[1].content]
+				res, ok := f.LocalVar[tOp.OpElem[1].Content]
 				if !ok {
-					interpreteError(funcName, "can not find variable "+tOp.opElem[1].content)
+					InterpreteError(funcName, "can not find variable "+tOp.OpElem[1].Content)
 				}
 				sendmsg = res
 			}
-			postMsg(sendmsg, conn)
+			PostMsg(sendmsg, conn)
 
 		default:
-			interpreteWarning(funcName, "unknown operation, skipping.")
+			InterpreteWarning(funcName, "unknown operation, skipping.")
 		}
 		f.PCp += 1
 		if f.PCp == funcLen {
@@ -510,31 +520,34 @@ func funcInvoker(funcName string, params *[]string, conn *websocket.Conn) string
 	}
 }
 
+//The struct of messages sent between server and clients.
 type MsgStruct struct {
 	Timestamp int64  `json:"timestamp"`
 	Content   string `json:"content"`
 }
 
-func getMsg(conn *websocket.Conn) string {
+//Fetch message from the client.
+func GetMsg(conn *websocket.Conn) string {
 	conn.SetReadDeadline(time.Now().Add(time.Second * time.Duration(600))) //close connection after 600s
 	recvmsg := new(MsgStruct)
 	err := conn.ReadJSON(&recvmsg)
 	if err != nil {
 		if netErr, ok := err.(net.Error); ok {
 			if netErr.Timeout() {
-				interpreteError("getmsg", "websocket receive message from "+conn.RemoteAddr().String()+" timeout")
+				InterpreteError("getmsg", "websocket receive message from "+conn.RemoteAddr().String()+" timeout")
 			}
 		}
 		if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
-			interpreteError("getmsg", fmt.Sprintf("websocket receive message from %v error: %v \n", conn.RemoteAddr(), err))
+			InterpreteError("getmsg", fmt.Sprintf("websocket receive message from %v error: %v \n", conn.RemoteAddr(), err))
 		}
 		panic("[Server] Info : client disconnect")
 	}
-	interpreteInfo("getmsg", "receive message from "+conn.RemoteAddr().String())
+	InterpreteInfo("getmsg", "receive message from "+conn.RemoteAddr().String())
 	return recvmsg.Content
 }
 
-func postMsg(content string, conn *websocket.Conn) {
+//Send message to the client.
+func PostMsg(content string, conn *websocket.Conn) {
 	conn.SetWriteDeadline(time.Now().Add(time.Second * time.Duration(600))) //close connection after 600s
 	sendmsg := new(MsgStruct)
 	sendmsg.Timestamp = time.Now().Unix()
@@ -543,28 +556,28 @@ func postMsg(content string, conn *websocket.Conn) {
 	if err != nil {
 		if netErr, ok := err.(net.Error); ok {
 			if netErr.Timeout() {
-				interpreteError("postmsg", "websocket send message to "+conn.RemoteAddr().String()+" timeout")
+				InterpreteError("postmsg", "websocket send message to "+conn.RemoteAddr().String()+" timeout")
 			}
 		}
 		if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
-			interpreteError("postmsg", fmt.Sprintf("websocket send message to %v error: %v \n", conn.RemoteAddr(), err))
+			InterpreteError("postmsg", fmt.Sprintf("websocket send message to %v error: %v \n", conn.RemoteAddr(), err))
 		}
 		panic("[Server] Info : client disconnect")
 	}
-	interpreteInfo("postmsg", "send message to "+conn.RemoteAddr().String())
+	InterpreteInfo("postmsg", "send message to "+conn.RemoteAddr().String())
 }
 
-//Show a error message of interpreter and exit
-func interpreteError(fname, msg string) {
+//Show a error message of interpreter and exit.
+func InterpreteError(fname, msg string) {
 	log.Panicln("[Interpreter] Error in func", fname, ":", msg)
 }
 
-//Show a warning message of interpreter
-func interpreteWarning(fname, msg string) {
+//Show a warning message of interpreter.
+func InterpreteWarning(fname, msg string) {
 	log.Println("[Interpreter] Warning in func", fname, ":", msg)
 }
 
-//Show a info message of interpreter
-func interpreteInfo(fname, msg string) {
+//Show a info message of interpreter.
+func InterpreteInfo(fname, msg string) {
 	log.Println("[Interpreter] Info in func", fname, ":", msg)
 }

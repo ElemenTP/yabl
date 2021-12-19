@@ -14,6 +14,7 @@ func init() {
 	Script = make(map[string]interface{})
 }
 
+//Check the validity of the input script, and generates IL for interpreter.
 func Compile() {
 	mainExists := false //a flag to show if exists a valid main function
 	for k, v := range Script {
@@ -24,24 +25,24 @@ func Compile() {
 			}
 
 			funcName := spiltkey[1]
-			//check if exists one and only one main function
+			//Check if exists one and only one main function.
 			if funcName == "main" {
 				if mainExists {
-					compileError(funcName, "duplicate main function.")
+					CompileError(funcName, "duplicate main function.")
 				} else {
 					mainExists = true
 				}
 				if len(spiltkey) > 2 {
-					compileError(funcName, "main function must not have params.")
+					CompileError(funcName, "main function must not have params.")
 				}
 			}
 
-			//check if function names use keywords
-			if getOpType(funcName) != op_null {
-				compileError(funcName, "can not use keywords as function names.")
+			//Check if function names use keywords.
+			if GetOpType(funcName) != op_null {
+				CompileError(funcName, "can not use keywords as function names.")
 			}
 
-			//check if functions are valid
+			//Check if functions are valid.
 			switch ifaceslice := v.(type) {
 			case []interface{}:
 				strslice := make([]string, 0, len(ifaceslice))
@@ -50,11 +51,11 @@ func Compile() {
 					case string:
 						strslice = append(strslice, elemTyped)
 					default:
-						compileError(funcName, "wrong function structure.")
+						CompileError(funcName, "wrong function structure.")
 					}
 				}
 
-				//compile string script to IL
+				//Compile string script to IL.
 				tempFuncIL := Function{spiltkey[2:], make([]Operation, 0, len(strslice))}
 				branchStack := stack.NewStack()
 				cycleStack := stack.NewStack()
@@ -63,9 +64,9 @@ func Compile() {
 					spiltstr := strings.Fields(s)
 					for i := 0; i < len(spiltstr); i += 1 {
 						tempLexIL := LexElem{}
-						//the word is a const string.
+						//The word is a const string.
 						if spiltstr[i][0] == '"' {
-							tempLexIL.lexType = lex_Constant
+							tempLexIL.LT = lex_Constant
 							tempString := ""
 							runeslise := []rune(spiltstr[i])
 							status := false
@@ -102,16 +103,16 @@ func Compile() {
 										tempString += "\""
 										status = false
 									} else {
-										tempLexIL.content = tempString
+										tempLexIL.Content = tempString
 										if ptr != len(runeslise)-1 {
-											compileWarning(funcName, "ignore character after \"")
+											CompileWarning(funcName, "ignore character after \"")
 										}
 										break findstr
 									}
 
 								default:
 									if status {
-										compileError(funcName, "unknown escape character "+"\\"+string(runeslise[ptr]))
+										CompileError(funcName, "unknown escape character "+"\\"+string(runeslise[ptr]))
 									} else {
 										tempString += string(runeslise[ptr])
 									}
@@ -120,52 +121,52 @@ func Compile() {
 								if ptr == len(runeslise) {
 									i += 1
 									if i == len(spiltstr) {
-										compileError(funcName, "incomplete string constant.")
+										CompileError(funcName, "incomplete string constant.")
 									}
 									runeslise = []rune(spiltstr[i])
 									tempString += " "
 									ptr = 0
 								}
 							}
-							tempOpIL.opElem = append(tempOpIL.opElem, tempLexIL)
+							tempOpIL.OpElem = append(tempOpIL.OpElem, tempLexIL)
 							continue
 						}
 
-						//word is a assignment op.
+						//The word is a assignment op.
 						if spiltstr[i] == "=" {
 							if i == 1 {
-								tempOpIL.assignment = true
+								tempOpIL.IsAssign = true
 								continue
 							} else {
-								compileError(funcName, "misplaced or duplicate \"=\" operation.")
+								CompileError(funcName, "misplaced or duplicate \"=\" operation.")
 							}
 						}
 
-						//word is identifier or keyword.
-						opType := getOpType(spiltstr[i])
-						tempLexIL.content = spiltstr[i]
+						//The word is identifier or keyword.
+						opType := GetOpType(spiltstr[i])
+						tempLexIL.Content = spiltstr[i]
 						if opType == op_null {
-							tempLexIL.lexType = lex_Identifier
+							tempLexIL.LT = lex_Identifier
 						} else {
-							tempLexIL.lexType = lex_Keyword
-							if tempOpIL.opType == op_null {
-								tempOpIL.opType = opType
-								if tempOpIL.assignment {
-									tempOpIL.opLocation = i - 1
+							tempLexIL.LT = lex_Keyword
+							if tempOpIL.OT == op_null {
+								tempOpIL.OT = opType
+								if tempOpIL.IsAssign {
+									tempOpIL.OpLoc = i - 1
 								} else {
-									tempOpIL.opLocation = i
+									tempOpIL.OpLoc = i
 								}
 							}
 						}
-						tempOpIL.opElem = append(tempOpIL.opElem, tempLexIL)
+						tempOpIL.OpElem = append(tempOpIL.OpElem, tempLexIL)
 					}
 
-					//op validity check
-					opType := tempOpIL.opType        //type of the operation
-					opLoc := tempOpIL.opLocation     //location of the operation element
-					hasAssign := tempOpIL.assignment //if the operation has assignment
-					opLen := len(tempOpIL.opElem)    //length of the slice of components of the operation
-					switch opType {                  //check validity by opcode
+					//Op validity check
+					opType := tempOpIL.OT          //type of the operation
+					opLoc := tempOpIL.OpLoc        //location of the operation element
+					hasAssign := tempOpIL.IsAssign //if the operation has assignment
+					opLen := len(tempOpIL.OpElem)  //length of the slice of components of the operation
+					switch opType {                //Check validity by opcode.
 					case op_null:
 						/*
 							op_null
@@ -174,16 +175,16 @@ func Compile() {
 						*/
 						if hasAssign {
 							if opLen < 2 {
-								compileError(funcName, "nothing to assign.")
+								CompileError(funcName, "nothing to assign.")
 							} else if opLen > 2 {
-								compileWarning(funcName, "more than one params are given, ignore all but first.")
+								CompileWarning(funcName, "more than one params are given, ignore all but first.")
 							}
-							switch tempOpIL.opElem[0].lexType {
+							switch tempOpIL.OpElem[0].LT {
 							case lex_Constant:
-								compileError(funcName, "result to assign to is a const string.")
+								CompileError(funcName, "result to assign to is a const string.")
 							}
 						} else {
-							compileWarning(funcName, "useless expression, ignoring.")
+							CompileWarning(funcName, "useless expression, ignoring.")
 						}
 
 					case op_if:
@@ -193,25 +194,25 @@ func Compile() {
 							op	condition
 						*/
 						if hasAssign {
-							compileError(funcName, "can not assign a if operation.")
+							CompileError(funcName, "can not assign a if operation.")
 						}
 						if opLoc != 0 {
-							compileError(funcName, "if operation is in wrong position.")
+							CompileError(funcName, "if operation is in wrong position.")
 						}
 						if opLen < 2 {
-							compileError(funcName, "if operation has no condition specified.")
+							CompileError(funcName, "if operation has no condition specified.")
 						} else if opLen > 2 {
-							compileWarning(funcName, "more than one condition is given to if operation, ignore all but first.")
+							CompileWarning(funcName, "more than one condition is given to if operation, ignore all but first.")
 						}
-						switch tempOpIL.opElem[1].lexType {
+						switch tempOpIL.OpElem[1].LT {
 						case lex_Constant:
-							tempOpIL.haspc = true
-							if len(tempOpIL.opElem[1].content) > 0 {
-								tempOpIL.pcValue = "true"
+							tempOpIL.IsPC = true
+							if len(tempOpIL.OpElem[1].Content) > 0 {
+								tempOpIL.PCValue = "true"
 							}
-							compileWarning(funcName, "useless if block, condition is a constant.")
+							CompileWarning(funcName, "useless if block, condition is a constant.")
 						case lex_Keyword:
-							compileError(funcName, "condition given to if operation is a keyword "+tempOpIL.opElem[1].content+".")
+							CompileError(funcName, "condition given to if operation is a keyword "+tempOpIL.OpElem[1].Content+".")
 						}
 						branchStack.Push(op_if)
 
@@ -222,16 +223,16 @@ func Compile() {
 							op
 						*/
 						if hasAssign {
-							compileError(funcName, "can not assign a else operation.")
+							CompileError(funcName, "can not assign a else operation.")
 						}
 						if opLoc != 0 {
-							compileError(funcName, "else operation is in wrong position.")
+							CompileError(funcName, "else operation is in wrong position.")
 						}
 						if opLen > 1 {
-							compileError(funcName, "unexpected elem behind else operation.")
+							CompileError(funcName, "unexpected elem behind else operation.")
 						}
 						if branchStack.Len() == 0 {
-							compileError(funcName, "else out of if-fi block.")
+							CompileError(funcName, "else out of if-fi block.")
 						}
 						branchStack.Update(op_else)
 
@@ -242,35 +243,35 @@ func Compile() {
 							op		condition
 						*/
 						if hasAssign {
-							compileError(funcName, "can not assign a elif operation.")
+							CompileError(funcName, "can not assign a elif operation.")
 						}
 						if opLoc != 0 {
-							compileError(funcName, "elif operation is in wrong position.")
+							CompileError(funcName, "elif operation is in wrong position.")
 						}
 						if opLen < 2 {
-							compileError(funcName, "elif operation has no condition specified.")
+							CompileError(funcName, "elif operation has no condition specified.")
 						} else if opLen > 2 {
-							compileWarning(funcName, "more than one condition is given to elif operation, ignore all but first.")
+							CompileWarning(funcName, "more than one condition is given to elif operation, ignore all but first.")
 						}
 						if branchStack.Len() == 0 {
-							compileError(funcName, "elif out of if-fi block.")
+							CompileError(funcName, "elif out of if-fi block.")
 						}
 						c := branchStack.Peek()
 						switch value := c.(type) {
 						case int:
 							if value == op_else {
-								compileError(funcName, "elif after else.")
+								CompileError(funcName, "elif after else.")
 							}
 						}
-						switch tempOpIL.opElem[1].lexType {
+						switch tempOpIL.OpElem[1].LT {
 						case lex_Constant:
-							tempOpIL.haspc = true
-							if len(tempOpIL.opElem[1].content) > 0 {
-								tempOpIL.pcValue = "true"
+							tempOpIL.IsPC = true
+							if len(tempOpIL.OpElem[1].Content) > 0 {
+								tempOpIL.PCValue = "true"
 							}
-							compileWarning(funcName, "useless elif block, condition is a constant.")
+							CompileWarning(funcName, "useless elif block, condition is a constant.")
 						case lex_Keyword:
-							compileError(funcName, "condition given to elif operation is a keyword "+tempOpIL.opElem[1].content+".")
+							CompileError(funcName, "condition given to elif operation is a keyword "+tempOpIL.OpElem[1].Content+".")
 						}
 
 					case op_fi:
@@ -280,16 +281,16 @@ func Compile() {
 							op
 						*/
 						if hasAssign {
-							compileError(funcName, "can not assign a fi operation.")
+							CompileError(funcName, "can not assign a fi operation.")
 						}
 						if opLoc != 0 {
-							compileError(funcName, "fi operation is in wrong position.")
+							CompileError(funcName, "fi operation is in wrong position.")
 						}
 						if opLen > 1 {
-							compileError(funcName, "unexpected elem behind fi operation.")
+							CompileError(funcName, "unexpected elem behind fi operation.")
 						}
 						if branchStack.Len() == 0 {
-							compileError(funcName, "fi out of if-fi block.")
+							CompileError(funcName, "fi out of if-fi block.")
 						}
 						branchStack.Pop()
 
@@ -300,13 +301,13 @@ func Compile() {
 							op
 						*/
 						if hasAssign {
-							compileError(funcName, "can not assign a loop operation.")
+							CompileError(funcName, "can not assign a loop operation.")
 						}
 						if opLoc != 0 {
-							compileError(funcName, "loop operation is in wrong position.")
+							CompileError(funcName, "loop operation is in wrong position.")
 						}
 						if opLen > 1 {
-							compileError(funcName, "unexpected elem behind loop operation.")
+							CompileError(funcName, "unexpected elem behind loop operation.")
 						}
 						cycleStack.Push(op_loop)
 
@@ -317,22 +318,22 @@ func Compile() {
 							op
 						*/
 						if hasAssign {
-							compileError(funcName, "can not assign a pool operation.")
+							CompileError(funcName, "can not assign a pool operation.")
 						}
 						if opLoc != 0 {
-							compileError(funcName, "pool operation is in wrong position.")
+							CompileError(funcName, "pool operation is in wrong position.")
 						}
 						if opLen > 1 {
-							compileError(funcName, "unexpected elem behind pool operation.")
+							CompileError(funcName, "unexpected elem behind pool operation.")
 						}
 						if cycleStack.Len() == 0 {
-							compileError(funcName, "pool out of loop block.")
+							CompileError(funcName, "pool out of loop block.")
 						}
 						c := cycleStack.Pop()
 						switch value := c.(type) {
 						case int:
 							if value == op_loop {
-								compileInfo(funcName, "infinity loop detected.")
+								CompileInfo(funcName, "infinity loop detected.")
 							}
 						}
 
@@ -343,16 +344,16 @@ func Compile() {
 							op
 						*/
 						if hasAssign {
-							compileError(funcName, "can not assign a continue operation.")
+							CompileError(funcName, "can not assign a continue operation.")
 						}
 						if opLoc != 0 {
-							compileError(funcName, "continue operation is in wrong position.")
+							CompileError(funcName, "continue operation is in wrong position.")
 						}
 						if opLen > 1 {
-							compileError(funcName, "unexpected elem behind continue operation.")
+							CompileError(funcName, "unexpected elem behind continue operation.")
 						}
 						if cycleStack.Len() == 0 {
-							compileError(funcName, "continue out of loop block.")
+							CompileError(funcName, "continue out of loop block.")
 						}
 
 					case op_break:
@@ -362,16 +363,16 @@ func Compile() {
 							op
 						*/
 						if hasAssign {
-							compileError(funcName, "can not assign a break operation.")
+							CompileError(funcName, "can not assign a break operation.")
 						}
 						if opLoc != 0 {
-							compileError(funcName, "break operation is in wrong position.")
+							CompileError(funcName, "break operation is in wrong position.")
 						}
 						if opLen > 1 {
-							compileError(funcName, "unexpected elem behind break operation.")
+							CompileError(funcName, "unexpected elem behind break operation.")
 						}
 						if cycleStack.Len() == 0 {
-							compileError(funcName, "break out of loop block.")
+							CompileError(funcName, "break out of loop block.")
 						}
 						cycleStack.Update(op_break)
 
@@ -382,20 +383,20 @@ func Compile() {
 							op		param
 						*/
 						if hasAssign {
-							compileError(funcName, "can not assign a return operation.")
+							CompileError(funcName, "can not assign a return operation.")
 						}
 						if opLoc != 0 {
-							compileError(funcName, "return operation is in wrong position.")
+							CompileError(funcName, "return operation is in wrong position.")
 						}
 						if opLen > 2 {
-							compileWarning(funcName, "more than one variable is given to return operation, ignore all but first.")
+							CompileWarning(funcName, "more than one variable is given to return operation, ignore all but first.")
 						}
-						switch tempOpIL.opElem[1].lexType {
+						switch tempOpIL.OpElem[1].LT {
 						case lex_Constant:
-							tempOpIL.haspc = true
-							tempOpIL.pcValue = tempOpIL.opElem[1].content
+							tempOpIL.IsPC = true
+							tempOpIL.PCValue = tempOpIL.OpElem[1].Content
 						case lex_Keyword:
-							compileError(funcName, "condition given to return operation is a keyword "+tempOpIL.opElem[1].content+".")
+							CompileError(funcName, "condition given to return operation is a keyword "+tempOpIL.OpElem[1].Content+".")
 						}
 
 					case op_equal:
@@ -409,40 +410,40 @@ func Compile() {
 							prefix = 1
 						}
 						if opLoc != 1+prefix {
-							compileError(funcName, "equal operation is in wrong position.")
+							CompileError(funcName, "equal operation is in wrong position.")
 						}
 						if opLen > 3+prefix {
-							compileWarning(funcName, "more than two variable is given to equal operation, ignore all but first two.")
+							CompileWarning(funcName, "more than two variable is given to equal operation, ignore all but first two.")
 						}
 						constCount := 0
-						switch tempOpIL.opElem[0+prefix].lexType {
+						switch tempOpIL.OpElem[0+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to equal operation is a keyword "+tempOpIL.opElem[0+prefix].content+".")
+							CompileError(funcName, "variable given to equal operation is a keyword "+tempOpIL.OpElem[0+prefix].Content+".")
 						}
-						switch tempOpIL.opElem[2+prefix].lexType {
+						switch tempOpIL.OpElem[2+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to equal operation is a keyword "+tempOpIL.opElem[2+prefix].content+".")
+							CompileError(funcName, "variable given to equal operation is a keyword "+tempOpIL.OpElem[2+prefix].Content+".")
 						}
 						if hasAssign {
-							switch tempOpIL.opElem[0].lexType {
+							switch tempOpIL.OpElem[0].LT {
 							case lex_Constant:
-								compileError(funcName, "result to assign to is a const string.")
+								CompileError(funcName, "result to assign to is a const string.")
 							case lex_Keyword:
-								compileError(funcName, "result to assign to is a keyword "+tempOpIL.opElem[0].content+".")
+								CompileError(funcName, "result to assign to is a keyword "+tempOpIL.OpElem[0].Content+".")
 							}
 							if constCount == 2 {
-								tempOpIL.haspc = true
-								if tempOpIL.opElem[0+prefix].content == tempOpIL.opElem[2+prefix].content {
-									tempOpIL.pcValue = "true"
+								tempOpIL.IsPC = true
+								if tempOpIL.OpElem[0+prefix].Content == tempOpIL.OpElem[2+prefix].Content {
+									tempOpIL.PCValue = "true"
 								}
-								compileWarning(funcName, "useless calculation, two const strings are given to equal operation.")
+								CompileWarning(funcName, "useless calculation, two const strings are given to equal operation.")
 							}
 						} else {
-							compileWarning(funcName, "result of equal operation is not assigned.")
+							CompileWarning(funcName, "result of equal operation is not assigned.")
 						}
 
 					case op_and:
@@ -456,40 +457,40 @@ func Compile() {
 							prefix = 1
 						}
 						if opLoc != 1+prefix {
-							compileError(funcName, "and operation is in wrong position.")
+							CompileError(funcName, "and operation is in wrong position.")
 						}
 						if opLen > 3+prefix {
-							compileWarning(funcName, "more than two variable is given to and operation, ignore all but first two.")
+							CompileWarning(funcName, "more than two variable is given to and operation, ignore all but first two.")
 						}
 						constCount := 0
-						switch tempOpIL.opElem[0+prefix].lexType {
+						switch tempOpIL.OpElem[0+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to and operation is a keyword "+tempOpIL.opElem[0+prefix].content+".")
+							CompileError(funcName, "variable given to and operation is a keyword "+tempOpIL.OpElem[0+prefix].Content+".")
 						}
-						switch tempOpIL.opElem[2+prefix].lexType {
+						switch tempOpIL.OpElem[2+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to and operation is a keyword "+tempOpIL.opElem[2+prefix].content+".")
+							CompileError(funcName, "variable given to and operation is a keyword "+tempOpIL.OpElem[2+prefix].Content+".")
 						}
 						if hasAssign {
-							switch tempOpIL.opElem[0].lexType {
+							switch tempOpIL.OpElem[0].LT {
 							case lex_Constant:
-								compileError(funcName, "result to assign to is a const string.")
+								CompileError(funcName, "result to assign to is a const string.")
 							case lex_Keyword:
-								compileError(funcName, "result to assign to is a keyword "+tempOpIL.opElem[0].content+".")
+								CompileError(funcName, "result to assign to is a keyword "+tempOpIL.OpElem[0].Content+".")
 							}
 							if constCount == 2 {
-								tempOpIL.haspc = true
-								if len(tempOpIL.opElem[0+prefix].content) > 0 && len(tempOpIL.opElem[2+prefix].content) > 0 {
-									tempOpIL.pcValue = "true"
+								tempOpIL.IsPC = true
+								if len(tempOpIL.OpElem[0+prefix].Content) > 0 && len(tempOpIL.OpElem[2+prefix].Content) > 0 {
+									tempOpIL.PCValue = "true"
 								}
-								compileWarning(funcName, "useless calculation, two const strings are given to and operation.")
+								CompileWarning(funcName, "useless calculation, two const strings are given to and operation.")
 							}
 						} else {
-							compileWarning(funcName, "result of and operation is not assigned.")
+							CompileWarning(funcName, "result of and operation is not assigned.")
 						}
 
 					case op_or:
@@ -503,40 +504,40 @@ func Compile() {
 							prefix = 1
 						}
 						if opLoc != 1+prefix {
-							compileError(funcName, "or operation is in wrong position.")
+							CompileError(funcName, "or operation is in wrong position.")
 						}
 						if opLen > 3+prefix {
-							compileWarning(funcName, "more than two variable is given to or operation, ignore all but first two.")
+							CompileWarning(funcName, "more than two variable is given to or operation, ignore all but first two.")
 						}
 						constCount := 0
-						switch tempOpIL.opElem[0+prefix].lexType {
+						switch tempOpIL.OpElem[0+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to or operation is a keyword "+tempOpIL.opElem[0+prefix].content+".")
+							CompileError(funcName, "variable given to or operation is a keyword "+tempOpIL.OpElem[0+prefix].Content+".")
 						}
-						switch tempOpIL.opElem[2+prefix].lexType {
+						switch tempOpIL.OpElem[2+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to or operation is a keyword "+tempOpIL.opElem[2+prefix].content+".")
+							CompileError(funcName, "variable given to or operation is a keyword "+tempOpIL.OpElem[2+prefix].Content+".")
 						}
 						if hasAssign {
-							switch tempOpIL.opElem[0].lexType {
+							switch tempOpIL.OpElem[0].LT {
 							case lex_Constant:
-								compileError(funcName, "result to assign to is a const string.")
+								CompileError(funcName, "result to assign to is a const string.")
 							case lex_Keyword:
-								compileError(funcName, "result to assign to is a keyword "+tempOpIL.opElem[0].content+".")
+								CompileError(funcName, "result to assign to is a keyword "+tempOpIL.OpElem[0].Content+".")
 							}
 							if constCount == 2 {
-								tempOpIL.haspc = true
-								if len(tempOpIL.opElem[0+prefix].content) > 0 || len(tempOpIL.opElem[2+prefix].content) > 0 {
-									tempOpIL.pcValue = "true"
+								tempOpIL.IsPC = true
+								if len(tempOpIL.OpElem[0+prefix].Content) > 0 || len(tempOpIL.OpElem[2+prefix].Content) > 0 {
+									tempOpIL.PCValue = "true"
 								}
-								compileWarning(funcName, "useless calculation, two const strings are given to or operation.")
+								CompileWarning(funcName, "useless calculation, two const strings are given to or operation.")
 							}
 						} else {
-							compileWarning(funcName, "result of or operation is not assigned.")
+							CompileWarning(funcName, "result of or operation is not assigned.")
 						}
 
 					case op_not:
@@ -550,34 +551,34 @@ func Compile() {
 							prefix = 1
 						}
 						if opLoc != 0+prefix {
-							compileError(funcName, "and operation is in wrong position.")
+							CompileError(funcName, "and operation is in wrong position.")
 						}
 						if opLen > 2+prefix {
-							compileWarning(funcName, "more than two variable is given to and operation, ignore all but first two.")
+							CompileWarning(funcName, "more than two variable is given to and operation, ignore all but first two.")
 						}
 						constCount := 0
-						switch tempOpIL.opElem[1+prefix].lexType {
+						switch tempOpIL.OpElem[1+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to and operation is a keyword "+tempOpIL.opElem[2+prefix].content+".")
+							CompileError(funcName, "variable given to and operation is a keyword "+tempOpIL.OpElem[2+prefix].Content+".")
 						}
 						if hasAssign {
-							switch tempOpIL.opElem[0].lexType {
+							switch tempOpIL.OpElem[0].LT {
 							case lex_Constant:
-								compileError(funcName, "result to assign to is a const string.")
+								CompileError(funcName, "result to assign to is a const string.")
 							case lex_Keyword:
-								compileError(funcName, "result to assign to is a keyword "+tempOpIL.opElem[0].content+".")
+								CompileError(funcName, "result to assign to is a keyword "+tempOpIL.OpElem[0].Content+".")
 							}
 							if constCount == 1 {
-								tempOpIL.haspc = true
-								if tempOpIL.opElem[1+prefix].content == "" {
-									tempOpIL.pcValue = "true"
+								tempOpIL.IsPC = true
+								if tempOpIL.OpElem[1+prefix].Content == "" {
+									tempOpIL.PCValue = "true"
 								}
-								compileWarning(funcName, "useless calculation, two const strings are given to and operation.")
+								CompileWarning(funcName, "useless calculation, two const strings are given to and operation.")
 							}
 						} else {
-							compileWarning(funcName, "result of and operation is not assigned.")
+							CompileWarning(funcName, "result of and operation is not assigned.")
 						}
 
 					case op_join:
@@ -591,38 +592,38 @@ func Compile() {
 							prefix = 1
 						}
 						if opLoc != 1+prefix {
-							compileError(funcName, "join operation is in wrong position.")
+							CompileError(funcName, "join operation is in wrong position.")
 						}
 						if opLen > 3+prefix {
-							compileWarning(funcName, "more than two variable is given to join operation, ignore all but first two.")
+							CompileWarning(funcName, "more than two variable is given to join operation, ignore all but first two.")
 						}
 						constCount := 0
-						switch tempOpIL.opElem[0+prefix].lexType {
+						switch tempOpIL.OpElem[0+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to join operation is a keyword "+tempOpIL.opElem[0+prefix].content+".")
+							CompileError(funcName, "variable given to join operation is a keyword "+tempOpIL.OpElem[0+prefix].Content+".")
 						}
-						switch tempOpIL.opElem[2+prefix].lexType {
+						switch tempOpIL.OpElem[2+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to join operation is a keyword "+tempOpIL.opElem[2+prefix].content+".")
+							CompileError(funcName, "variable given to join operation is a keyword "+tempOpIL.OpElem[2+prefix].Content+".")
 						}
 						if hasAssign {
-							switch tempOpIL.opElem[0].lexType {
+							switch tempOpIL.OpElem[0].LT {
 							case lex_Constant:
-								compileError(funcName, "result to assign to is a const string.")
+								CompileError(funcName, "result to assign to is a const string.")
 							case lex_Keyword:
-								compileError(funcName, "result to assign to is a keyword "+tempOpIL.opElem[0].content+".")
+								CompileError(funcName, "result to assign to is a keyword "+tempOpIL.OpElem[0].Content+".")
 							}
 							if constCount == 2 {
-								tempOpIL.haspc = true
-								tempOpIL.pcValue = tempOpIL.opElem[0+prefix].content + tempOpIL.opElem[2+prefix].content
-								compileWarning(funcName, "useless calculation, two const strings are given to join operation.")
+								tempOpIL.IsPC = true
+								tempOpIL.PCValue = tempOpIL.OpElem[0+prefix].Content + tempOpIL.OpElem[2+prefix].Content
+								CompileWarning(funcName, "useless calculation, two const strings are given to join operation.")
 							}
 						} else {
-							compileWarning(funcName, "result of join operation is not assigned.")
+							CompileWarning(funcName, "result of join operation is not assigned.")
 						}
 
 					case op_contain:
@@ -636,40 +637,40 @@ func Compile() {
 							prefix = 1
 						}
 						if opLoc != 1+prefix {
-							compileError(funcName, "contain operation is in wrong position.")
+							CompileError(funcName, "contain operation is in wrong position.")
 						}
 						if opLen > 3+prefix {
-							compileWarning(funcName, "more than two variable is given to contain operation, ignore all but first two.")
+							CompileWarning(funcName, "more than two variable is given to contain operation, ignore all but first two.")
 						}
 						constCount := 0
-						switch tempOpIL.opElem[0+prefix].lexType {
+						switch tempOpIL.OpElem[0+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to contain operation is a keyword "+tempOpIL.opElem[0+prefix].content+".")
+							CompileError(funcName, "variable given to contain operation is a keyword "+tempOpIL.OpElem[0+prefix].Content+".")
 						}
-						switch tempOpIL.opElem[2+prefix].lexType {
+						switch tempOpIL.OpElem[2+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to contain operation is a keyword "+tempOpIL.opElem[2+prefix].content+".")
+							CompileError(funcName, "variable given to contain operation is a keyword "+tempOpIL.OpElem[2+prefix].Content+".")
 						}
 						if hasAssign {
-							switch tempOpIL.opElem[0].lexType {
+							switch tempOpIL.OpElem[0].LT {
 							case lex_Constant:
-								compileError(funcName, "result to assign to is a const string.")
+								CompileError(funcName, "result to assign to is a const string.")
 							case lex_Keyword:
-								compileError(funcName, "result to assign to is a keyword "+tempOpIL.opElem[0].content+".")
+								CompileError(funcName, "result to assign to is a keyword "+tempOpIL.OpElem[0].Content+".")
 							}
 							if constCount == 2 {
-								tempOpIL.haspc = true
-								if strings.Contains(tempOpIL.opElem[0+prefix].content, tempOpIL.opElem[2+prefix].content) {
-									tempOpIL.pcValue = "true"
+								tempOpIL.IsPC = true
+								if strings.Contains(tempOpIL.OpElem[0+prefix].Content, tempOpIL.OpElem[2+prefix].Content) {
+									tempOpIL.PCValue = "true"
 								}
-								compileWarning(funcName, "useless calculation, two const strings are given to contain operation.")
+								CompileWarning(funcName, "useless calculation, two const strings are given to contain operation.")
 							}
 						} else {
-							compileWarning(funcName, "result of contain operation is not assigned.")
+							CompileWarning(funcName, "result of contain operation is not assigned.")
 						}
 
 					case op_hasprefix:
@@ -683,40 +684,40 @@ func Compile() {
 							prefix = 1
 						}
 						if opLoc != 1+prefix {
-							compileError(funcName, "hasprefix operation is in wrong position.")
+							CompileError(funcName, "hasprefix operation is in wrong position.")
 						}
 						if opLen > 3+prefix {
-							compileWarning(funcName, "more than two variable is given to hasprefix operation, ignore all but first two.")
+							CompileWarning(funcName, "more than two variable is given to hasprefix operation, ignore all but first two.")
 						}
 						constCount := 0
-						switch tempOpIL.opElem[0+prefix].lexType {
+						switch tempOpIL.OpElem[0+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to hasprefix operation is a keyword "+tempOpIL.opElem[0+prefix].content+".")
+							CompileError(funcName, "variable given to hasprefix operation is a keyword "+tempOpIL.OpElem[0+prefix].Content+".")
 						}
-						switch tempOpIL.opElem[2+prefix].lexType {
+						switch tempOpIL.OpElem[2+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to hasprefix operation is a keyword "+tempOpIL.opElem[2+prefix].content+".")
+							CompileError(funcName, "variable given to hasprefix operation is a keyword "+tempOpIL.OpElem[2+prefix].Content+".")
 						}
 						if hasAssign {
-							switch tempOpIL.opElem[0].lexType {
+							switch tempOpIL.OpElem[0].LT {
 							case lex_Constant:
-								compileError(funcName, "result to assign to is a const string.")
+								CompileError(funcName, "result to assign to is a const string.")
 							case lex_Keyword:
-								compileError(funcName, "result to assign to is a keyword "+tempOpIL.opElem[0].content+".")
+								CompileError(funcName, "result to assign to is a keyword "+tempOpIL.OpElem[0].Content+".")
 							}
 							if constCount == 2 {
-								tempOpIL.haspc = true
-								if strings.HasPrefix(tempOpIL.opElem[0+prefix].content, tempOpIL.opElem[2+prefix].content) {
-									tempOpIL.pcValue = "true"
+								tempOpIL.IsPC = true
+								if strings.HasPrefix(tempOpIL.OpElem[0+prefix].Content, tempOpIL.OpElem[2+prefix].Content) {
+									tempOpIL.PCValue = "true"
 								}
-								compileWarning(funcName, "useless calculation, two const strings are given to hasprefix operation.")
+								CompileWarning(funcName, "useless calculation, two const strings are given to hasprefix operation.")
 							}
 						} else {
-							compileWarning(funcName, "result of hasprefix operation is not assigned.")
+							CompileWarning(funcName, "result of hasprefix operation is not assigned.")
 						}
 
 					case op_hassuffix:
@@ -730,40 +731,40 @@ func Compile() {
 							prefix = 1
 						}
 						if opLoc != 1+prefix {
-							compileError(funcName, "hassuffix operation is in wrong position.")
+							CompileError(funcName, "hassuffix operation is in wrong position.")
 						}
 						if opLen > 3+prefix {
-							compileWarning(funcName, "more than two variable is given to hassuffix operation, ignore all but first two.")
+							CompileWarning(funcName, "more than two variable is given to hassuffix operation, ignore all but first two.")
 						}
 						constCount := 0
-						switch tempOpIL.opElem[0+prefix].lexType {
+						switch tempOpIL.OpElem[0+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to hassuffix operation is a keyword "+tempOpIL.opElem[0+prefix].content+".")
+							CompileError(funcName, "variable given to hassuffix operation is a keyword "+tempOpIL.OpElem[0+prefix].Content+".")
 						}
-						switch tempOpIL.opElem[2+prefix].lexType {
+						switch tempOpIL.OpElem[2+prefix].LT {
 						case lex_Constant:
 							constCount += 1
 						case lex_Keyword:
-							compileError(funcName, "variable given to hassuffix operation is a keyword "+tempOpIL.opElem[2+prefix].content+".")
+							CompileError(funcName, "variable given to hassuffix operation is a keyword "+tempOpIL.OpElem[2+prefix].Content+".")
 						}
 						if hasAssign {
-							switch tempOpIL.opElem[0].lexType {
+							switch tempOpIL.OpElem[0].LT {
 							case lex_Constant:
-								compileError(funcName, "result to assign to is a const string.")
+								CompileError(funcName, "result to assign to is a const string.")
 							case lex_Keyword:
-								compileError(funcName, "result to assign to is a keyword "+tempOpIL.opElem[0].content+".")
+								CompileError(funcName, "result to assign to is a keyword "+tempOpIL.OpElem[0].Content+".")
 							}
 							if constCount == 2 {
-								tempOpIL.haspc = true
-								if strings.HasSuffix(tempOpIL.opElem[0+prefix].content, tempOpIL.opElem[2+prefix].content) {
-									tempOpIL.pcValue = "true"
+								tempOpIL.IsPC = true
+								if strings.HasSuffix(tempOpIL.OpElem[0+prefix].Content, tempOpIL.OpElem[2+prefix].Content) {
+									tempOpIL.PCValue = "true"
 								}
-								compileWarning(funcName, "useless calculation, two const strings are given to hassuffix operation.")
+								CompileWarning(funcName, "useless calculation, two const strings are given to hassuffix operation.")
 							}
 						} else {
-							compileWarning(funcName, "result of hassuffix operation is not assigned.")
+							CompileWarning(funcName, "result of hassuffix operation is not assigned.")
 						}
 
 					case op_invoke:
@@ -777,32 +778,32 @@ func Compile() {
 							prefix = 1
 						}
 						if opLoc != 0+prefix {
-							compileError(funcName, "invoke operation is in wrong position.")
+							CompileError(funcName, "invoke operation is in wrong position.")
 						}
 						if opLen < 2+prefix {
-							compileError(funcName, "no function is provided to invoke.")
+							CompileError(funcName, "no function is provided to invoke.")
 						}
-						switch tempOpIL.opElem[1+prefix].lexType {
+						switch tempOpIL.OpElem[1+prefix].LT {
 						case lex_Constant:
-							compileError(funcName, "function name given to invoke operation is a const string.")
+							CompileError(funcName, "function name given to invoke operation is a const string.")
 						case lex_Keyword:
-							compileError(funcName, "function name given to invoke operation is a keyword "+tempOpIL.opElem[1+prefix].content+".")
+							CompileError(funcName, "function name given to invoke operation is a keyword "+tempOpIL.OpElem[1+prefix].Content+".")
 						}
 						for i := 2 + prefix; i < opLen; i++ {
-							switch tempOpIL.opElem[i].lexType {
+							switch tempOpIL.OpElem[i].LT {
 							case lex_Keyword:
-								compileError(funcName, "variable given to invoke operation is a keyword "+tempOpIL.opElem[i].content+".")
+								CompileError(funcName, "variable given to invoke operation is a keyword "+tempOpIL.OpElem[i].Content+".")
 							}
 						}
 						if hasAssign {
-							switch tempOpIL.opElem[0].lexType {
+							switch tempOpIL.OpElem[0].LT {
 							case lex_Constant:
-								compileError(funcName, "result to assign to is a const string.")
+								CompileError(funcName, "result to assign to is a const string.")
 							case lex_Keyword:
-								compileError(funcName, "result to assign to is a keyword "+tempOpIL.opElem[0].content+".")
+								CompileError(funcName, "result to assign to is a keyword "+tempOpIL.OpElem[0].Content+".")
 							}
 						} else {
-							compileWarning(funcName, "result of invoke operation is not assigned.")
+							CompileWarning(funcName, "result of invoke operation is not assigned.")
 						}
 
 					case op_getmsg:
@@ -816,20 +817,20 @@ func Compile() {
 							prefix = 1
 						}
 						if opLoc != 0+prefix {
-							compileError(funcName, "getmsg operation is in wrong position.")
+							CompileError(funcName, "getmsg operation is in wrong position.")
 						}
 						if opLen > 1+prefix {
-							compileError(funcName, "unexpected elem behind getmsg operation.")
+							CompileError(funcName, "unexpected elem behind getmsg operation.")
 						}
 						if hasAssign {
-							switch tempOpIL.opElem[0].lexType {
+							switch tempOpIL.OpElem[0].LT {
 							case lex_Constant:
-								compileError(funcName, "result to assign to is a const string.")
+								CompileError(funcName, "result to assign to is a const string.")
 							case lex_Keyword:
-								compileError(funcName, "result to assign to is a keyword "+tempOpIL.opElem[0].content+".")
+								CompileError(funcName, "result to assign to is a keyword "+tempOpIL.OpElem[0].Content+".")
 							}
 						} else {
-							compileWarning(funcName, "result of getmsg operation is not assigned.")
+							CompileWarning(funcName, "result of getmsg operation is not assigned.")
 						}
 
 					case op_postmsg:
@@ -839,38 +840,38 @@ func Compile() {
 							op		param1
 						*/
 						if hasAssign {
-							compileError(funcName, "can not assign a postmsg operation.")
+							CompileError(funcName, "can not assign a postmsg operation.")
 						}
 						if opLoc != 0 {
-							compileError(funcName, "postmsg operation is in wrong position.")
+							CompileError(funcName, "postmsg operation is in wrong position.")
 						}
 						if opLen < 2 {
-							compileError(funcName, "postmsg operation has no variable specified.")
+							CompileError(funcName, "postmsg operation has no variable specified.")
 						} else if opLen > 2 {
-							compileWarning(funcName, "more than one variable is given to postmsg operation, ignore all but first.")
+							CompileWarning(funcName, "more than one variable is given to postmsg operation, ignore all but first.")
 						}
-						switch tempOpIL.opElem[1].lexType {
+						switch tempOpIL.OpElem[1].LT {
 						case lex_Keyword:
-							compileError(funcName, "variable given to postmsg operation is a keyword "+tempOpIL.opElem[1].content+".")
+							CompileError(funcName, "variable given to postmsg operation is a keyword "+tempOpIL.OpElem[1].Content+".")
 						}
 
 					}
-					tempFuncIL.ops = append(tempFuncIL.ops, tempOpIL)
+					tempFuncIL.FuncElem = append(tempFuncIL.FuncElem, tempOpIL)
 				}
 				if branchStack.Len() != 0 {
-					compileError(funcName, "if-fi block is not closed")
+					CompileError(funcName, "if-fi block is not closed")
 				}
 				if cycleStack.Len() != 0 {
-					compileError(funcName, "loop block is not closed")
+					CompileError(funcName, "loop block is not closed")
 				}
-				compileInfo(funcName, "identified function.")
+				CompileInfo(funcName, "identified function.")
 				if _, ok := IL[funcName]; ok {
-					compileWarning(funcName, "duplicated function "+funcName+", keep the first function")
+					CompileWarning(funcName, "duplicated function "+funcName+", keep the first function")
 				} else {
 					IL[funcName] = tempFuncIL
 				}
 			default:
-				compileError(funcName, "wrong function structure.")
+				CompileError(funcName, "wrong function structure.")
 			}
 		}
 	}
@@ -879,17 +880,17 @@ func Compile() {
 	}
 }
 
-//Show a error message of compiler and exit
-func compileError(fname, msg string) {
+//Show a error message of compiler and exit.
+func CompileError(fname, msg string) {
 	log.Fatalln("[Compiler] Error in func", fname, ":", msg)
 }
 
-//Show a warning message of compiler
-func compileWarning(fname, msg string) {
+//Show a warning message of compiler.
+func CompileWarning(fname, msg string) {
 	log.Println("[Compiler] Warning in func", fname, ":", msg)
 }
 
-//Show a info message of compiler
-func compileInfo(fname, msg string) {
+//Show a info message of compiler.
+func CompileInfo(fname, msg string) {
 	log.Println("[Compiler] Info in func", fname, ":", msg)
 }
