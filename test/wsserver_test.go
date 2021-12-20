@@ -13,9 +13,11 @@ import (
 )
 
 var testserver *lib.WsServer
+var url string
 
 func init() {
 	testserver = lib.NewWsServer("127.0.0.1:34599", "tcp")
+	url = "ws://127.0.0.1:34599/ws"
 	go testserver.Start()
 }
 
@@ -38,7 +40,6 @@ func Benchmark_Httphandle(b *testing.B) {
 }
 
 func Test_Websockethandle(t *testing.T) {
-	url := "ws://127.0.0.1:34599/ws"
 	scriptstr := `
 func main:
 - postmsg "你好"`
@@ -66,7 +67,7 @@ func main:
 	fmt.Println(time.Unix(recvmsg.Timestamp, 0).Format(time.RFC3339), recvmsg.Content)
 }
 
-func overalltest(url string, script *string, input *string, t *testing.T) {
+func overalltest(script *string, input *string, t *testing.T) {
 	genScript([]byte(*script))
 	lib.Compile()
 
@@ -146,7 +147,6 @@ func overalltest(url string, script *string, input *string, t *testing.T) {
 }
 
 func Test_Websockethandles1(t *testing.T) {
-	url := "ws://127.0.0.1:34599/ws"
 	scriptstr := `
 address: 127.0.0.1
 port: 8080
@@ -159,6 +159,7 @@ func main:
   - answer = getmsg
   - flag2 = answer contain "跳楼"
   - if flag2
+  - postmsg "亲亲，消消气，消消气。"
   - break
   - fi
   - postmsg "亲亲，您不要生气呢，这边正在尝试解决，可以多等待几天看看呢。"
@@ -179,14 +180,12 @@ func main:
 跳楼～
 跳楼～
 跳楼～
-。。。
-`
+。。。`
 
-	overalltest(url, &scriptstr, &inputstr, t)
+	overalltest(&scriptstr, &inputstr, t)
 }
 
 func Test_Websockethandles2(t *testing.T) {
-	url := "ws://127.0.0.1:34599/ws"
 	scriptstr := `
 address: 127.0.0.1
 port: 8080
@@ -220,5 +219,20 @@ func main:
 。。。
 `
 
-	overalltest(url, &scriptstr, &inputstr, t)
+	overalltest(&scriptstr, &inputstr, t)
+}
+
+func Test_Websockethandles3(t *testing.T) {
+	script := `#test script 3
+address: 127.0.0.1
+port: 8080
+func main:
+  - hello = invoke test "param1" "param2"
+  - postmsg hello
+
+func test param1:
+  - return "hello"`
+	input := ""
+	overalltest(&script, &input, t)
+
 }

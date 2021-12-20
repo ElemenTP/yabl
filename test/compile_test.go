@@ -98,6 +98,7 @@ func main:
   - answer = getmsg
   - flag2 = answer contain "跳楼"
   - if flag2
+  - postmsg "亲亲，消消气，消消气。"
   - break
   - fi
   - postmsg "亲亲，您不要生气呢，这边正在尝试解决，可以多等待几天看看呢。"
@@ -109,6 +110,58 @@ func main:
   - fi
   - pool
   - postmsg "亲亲，正在为您接入人工客服呢。"`
+
+	genScript([]byte(scriptstr))
+	lib.Compile()
+}
+
+func Test_Compile4(t *testing.T) {
+	scriptstr := `
+#test script 3
+address: 127.0.0.1
+port: 8080`
+
+	genScript([]byte(scriptstr))
+	lib.Compile()
+}
+
+func Test_Compile5(t *testing.T) {
+	scriptstr := `
+#test script 3
+address: 127.0.0.1
+port: 8080
+func main:
+`
+
+	genScript([]byte(scriptstr))
+	lib.Compile()
+}
+
+func Test_Compile6(t *testing.T) {
+	scriptstr := `
+#test script 3
+address: 127.0.0.1
+port: 8080
+func main test:
+  - postmsg hello
+`
+
+	genScript([]byte(scriptstr))
+	lib.Compile()
+}
+
+func Test_Compile7(t *testing.T) {
+	scriptstr := `
+#test script 3
+address: 127.0.0.1
+port: 8080
+func main:
+  - hello = invoke test "param1" "param2"
+  - postmsg hello
+
+func test:
+  - return "hello"
+`
 
 	genScript([]byte(scriptstr))
 	lib.Compile()
@@ -128,6 +181,7 @@ func main:
   - answer = getmsg
   - flag2 = answer contain "跳楼"
   - if flag2
+  - postmsg "亲亲，消消气，消消气。"
   - break
   - fi
   - postmsg "亲亲，您不要生气呢，这边正在尝试解决，可以多等待几天看看呢。"
