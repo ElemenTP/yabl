@@ -809,7 +809,7 @@ func Compile() {
 					case op_getmsg:
 						/*
 							op_getmsg
-							____	equal
+							____	getmsg
 							assign	op
 						*/
 						prefix := 0
