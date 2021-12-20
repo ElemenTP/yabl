@@ -9,7 +9,7 @@ yabl服务器与解释器主要有三种用法
 3. yabl [-s/--script] [script file path] [-a/--address] [server listen address] [-p/--port] [server listen port]  
 编译脚本文件并运行服务器，服务器侦听的IP地址和端口可由参数指定，优先于脚本文件中指定的IP地址和端口。  
 
-还有completion、help等命令，--help参数等，为cobra库所提供的功能，此处省略说明。
+还有completion、help等命令，--help参数等，为cobra库默认提供的功能，此处省略说明。
 ## ws接口
 yabl服务器与解释器使用websocket协议作为接口，api路径为/ws。  
 yabl服务器与解释器和客户端通过websocket交换websocket标准TextMessage，内容为json格式的文本，是一个结构的序列化的json。该结构如下：  
