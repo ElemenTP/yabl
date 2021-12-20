@@ -55,22 +55,30 @@ func Test_Compile2(t *testing.T) {
 address: 127.0.0.1
 port: 8080
 func main:
-  - hello = "你好，"
-  - hello = invoke joinfunc hello
-  - postmsg hello
+  - postmsg "您好，这里是自动服务机器人，请问您要办理什么业务呢？\n本机器人可以办理开户、查询、咨询、注销等业务。"
   - loop
   - answer = getmsg
-  - flag = answer equal "测试"
-  - if flag
+  - flag1 = answer contain "开户"
+  - flag2 = answer contain "查询"
+  - flag3 = answer contain "咨询"
+  - flag4 = answer contain "注销"
+  - if flag1
+  - postmsg "正在为您转到开户业务，请稍等。"
   - break
+  - elif flag2
+  - postmsg "正在为您转到查询业务，请稍等。"
+  - break
+  - elif flag3
+  - postmsg "正在为您转到咨询业务，请稍等。"
+  - break
+  - elif flag4
+  - postmsg "正在为您转到注销业务，请稍等。"
+  - break
+  - else
+  - postmsg "对不起，没有听懂。\n本机器人可以办理开户、查询、咨询、注销等业务。"
   - fi
-  - postmsg "试试告诉我测试"
   - pool
-  - postmsg "测试结束，再见"
-
-func joinfunc hello:
-  - temp = hello join "世界"
-  - return temp`
+  - postmsg "感谢您的使用，再见。"`
 
 	genScript([]byte(scriptstr))
 	lib.Compile()
