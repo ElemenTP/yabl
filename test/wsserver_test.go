@@ -19,11 +19,13 @@ func init() {
 	testserver = lib.NewWsServer("127.0.0.1:34599", "tcp")
 	url = "ws://127.0.0.1:34599/ws"
 	go testserver.Start()
+	<-time.After(time.Second)
 }
 
 func Test_Httphandle(t *testing.T) {
 	resp, err := http.Get("http://127.0.0.1:34599/ws")
 	if err != nil {
+		fmt.Println(err)
 		t.FailNow()
 	}
 	resp.Body.Close()
@@ -33,6 +35,7 @@ func Benchmark_Httphandle(b *testing.B) {
 	for i := 0; i < b.N; i++ { //use b.N for looping
 		resp, err := http.Get("http://127.0.0.1:34599/ws")
 		if err != nil {
+			fmt.Println(err)
 			b.FailNow()
 		}
 		resp.Body.Close()
@@ -46,7 +49,6 @@ func main:
 	genScript([]byte(scriptstr))
 	lib.Compile()
 
-	<-time.After(time.Second)
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
 	if err != nil {
 		fmt.Println(err)
@@ -71,7 +73,6 @@ func overalltest(script *string, input *string, t *testing.T) {
 	genScript([]byte(*script))
 	lib.Compile()
 
-	<-time.After(time.Second)
 	strslice := strings.Split(*input, "\n")
 
 	conn, _, err := websocket.DefaultDialer.Dial(url, nil)
