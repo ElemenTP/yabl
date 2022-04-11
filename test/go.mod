@@ -1,6 +1,6 @@
 module yabl-test
 
-go 1.17
+go 1.18
 
 require yabl v0.0.0
 
@@ -11,8 +11,8 @@ require (
 )
 
 require (
-	github.com/gorilla/websocket v1.4.2
-	gopkg.in/yaml.v2 v2.4.0
+	github.com/gorilla/websocket v1.5.0
+	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
 
 replace yabl => ../

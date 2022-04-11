@@ -5,7 +5,7 @@ import (
 	"testing"
 	"yabl/lib"
 
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 func genScript(scripstr []byte) {
