@@ -6,28 +6,22 @@ import (
 	"yabl/lib"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 //Add version command into the cli app, will show version info and compile time.
 func init() {
-	flags := tryCmd.Flags()
-	flags.StringVarP(&iptScript, "script", "s", "", "script file path")
 	rootCmd.AddCommand(tryCmd)
 }
 
 var tryCmd = &cobra.Command{
-	Use:   "try",
+	Use:   "try [script]",
 	Short: "Check script validity",
 	Long:  "Try to compile the script, check its validity",
-	Run: func(cmd *cobra.Command, args []string) {
-		//Exit when no script file was specified.
-		if iptScript == "" {
-			log.Fatalln("[Server] Error : no script file was specified, existing...")
-		}
-
+	Args:  scriptArg,
+	Run: func(_ *cobra.Command, args []string) {
 		//Read scripts from file.
-		yamlFile, err := ioutil.ReadFile(iptScript)
+		yamlFile, err := ioutil.ReadFile(args[0])
 		if err != nil {
 			log.Fatalln(err)
 		}
@@ -35,9 +29,11 @@ var tryCmd = &cobra.Command{
 		if err != nil {
 			log.Fatalln(err)
 		}
-		log.Println("[Server] Info : read script from", iptScript)
+		log.Println("[Server] Info : read script from", args[0])
 
 		//Compile script.
 		lib.Compile()
+
+		log.Println("[Server] Info : script successfully compiled")
 	},
 }

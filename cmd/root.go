@@ -1,33 +1,32 @@
 package cmd
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
+	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"yabl/lib"
 
 	"github.com/spf13/cobra"
-	"gopkg.in/yaml.v2"
+	"gopkg.in/yaml.v3"
 )
 
 var (
-	iptScript string
-	rootCmd   = &cobra.Command{
-		Use:   "yabl",
+	rootCmd = &cobra.Command{
+		Use:   "yabl [script]",
 		Short: "Yet Another Bot Language interpreter",
 		Long:  "A yabl interpreter in go, using websocket as interface.",
+		Args:  scriptArg,
 		Run: func(cmd *cobra.Command, args []string) {
 			flags := cmd.Flags()
 
-			//Exit when no script file was specified.
-			if iptScript == "" {
-				log.Fatalln("[Server] Error : no script file was specified, existing...")
-			}
-
 			//Read scripts from file.
-			yamlFile, err := ioutil.ReadFile(iptScript)
+			yamlFile, err := ioutil.ReadFile(args[0])
 			if err != nil {
 				log.Fatalln(err)
 			}
@@ -35,7 +34,7 @@ var (
 			if err != nil {
 				log.Fatalln(err)
 			}
-			log.Println("[Server] Info : read script from", iptScript)
+			log.Println("[Server] Info : read script from", args[0])
 
 			//Compile script.
 			lib.Compile()
@@ -79,8 +78,16 @@ var (
 			}
 
 			//Start a websocket server.
-			ws := lib.NewWsServer(laddr, lnet)
-			ws.Start()
+			go func() {
+				ws := lib.NewWsServer(laddr, lnet)
+				ws.Start()
+			}()
+
+			sigCh := make(chan os.Signal, 1)
+			signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+
+			<-sigCh
+			fmt.Println("Got interrupt message, existing...")
 		},
 	}
 )
@@ -96,7 +103,16 @@ func Execute() {
 //Set flags of the application.
 func init() {
 	flags := rootCmd.Flags()
-	flags.StringVarP(&iptScript, "script", "s", "", "script file path")
 	flags.StringP("address", "a", "", "server listen address (default 127.0.0.1)")
 	flags.StringP("port", "p", "", "server listen port (default 8080)")
+}
+
+func scriptArg(_ *cobra.Command, args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("[Server] Error : no script file was specified")
+	}
+	if len(args) > 1 {
+		return fmt.Errorf("[Server] Error : more than one script file was specified")
+	}
+	return nil
 }
