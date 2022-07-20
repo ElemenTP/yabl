@@ -5,7 +5,7 @@ This Project is a yabl implementation in go
 Using yabl-client to connect the server.  
 Script:
 ```yaml
-#!/usr/bin/yabl -s
+#!/usr/bin/yabl
 address: 127.0.0.1
 port: 8080
 func main:
@@ -41,4 +41,4 @@ Disconnected from server ws://127.0.0.1:8080/ws
 ## Thanks
 [spf13/cobra](https://github.com/spf13/cobra)  
 [gorilla/websocket](https://github.com/gorilla/websocket)  
-[gopkg.in/yaml.v2](https://github.com/go-yaml/yaml)
+[gopkg.in/yaml.v3](https://github.com/go-yaml/yaml)
